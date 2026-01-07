@@ -529,9 +529,10 @@ Settings.Parent = Holder
 Settings.Active = true
 Settings.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
 Settings.BorderSizePixel = 0
-Settings.Position = UDim2.new(0, 0, 0, 240) -- Angepasst an neue Höhe
+Settings.Position = UDim2.new(0, 0, 0, 300) -- Startet versteckt (außerhalb)
 Settings.Size = UDim2.new(0, 300, 0, 180) -- Angepasst an neue Größe
 Settings.ZIndex = 10
+Settings.Visible = true -- Sichtbar, aber außerhalb
 table.insert(shade1,Settings)
 
 -- Rounded Corner für Settings
@@ -3336,14 +3337,16 @@ function notify(text,text2,length)
 			closepressed = true
 			pinNotification:Disconnect()
 		end)
+		-- Automatisches Verschwinden nach Zeit
 		if length and isNumber(length) then
 			wait(length)
 		else
-			wait(10)
+			wait(5) -- Reduziert von 10 auf 5 Sekunden für bessere UX
 		end
 		if LnotifyCount == notifyCount then
 			if closepressed == false and notificationPinned == false then
 				pinNotification:Disconnect()
+				-- Notification verschwindet automatisch
 				Notification:TweenPosition(UDim2.new(1, Notification.Position.X.Offset, 1, 0), "InOut", "Quart", 0.5, true, nil)
 			end
 			notifyCount = 0
@@ -3956,12 +3959,16 @@ end)
 
 
 SettingsButton.MouseButton1Click:Connect(function()
-	if SettingsOpen == false then SettingsOpen = true
+	if SettingsOpen == false then 
+		SettingsOpen = true
+		-- Zeige Settings wenn Button geklickt wird
 		Settings:TweenPosition(UDim2.new(0, 0, 0, 66), "InOut", "Quart", 0.5, true, nil)
 		CMDsF.Visible = false
-	else SettingsOpen = false
+	else 
+		SettingsOpen = false
 		CMDsF.Visible = true
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.5, true, nil)
+		-- Verstecke Settings wieder
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 300), "InOut", "Quart", 0.5, true, nil)
 	end
 end)
 
@@ -4491,7 +4498,8 @@ task.spawn(function()
 				if SettingsOpen == true then
 					wait(0.2)
 					CMDsF.Visible = true
-					Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.2, true, nil)
+					Settings:TweenPosition(UDim2.new(0, 0, 0, 300), "InOut", "Quart", 0.2, true, nil) -- Verstecke Settings
+					SettingsOpen = false
 				end
 				IndexContents(PlayerGui.Chat.Frame.ChatBarParentFrame.Frame.BoxFrame.Frame.ChatBar.Text:lower():sub(2),true)
 			else
@@ -5804,8 +5812,10 @@ Cmdbar.FocusLost:Connect(function(enterpressed)
 		IndexContents('',true,false,true)
 		if SettingsOpen == true then
 			wait(0.2)
-			Settings:TweenPosition(UDim2.new(0, 0, 0, 66), "InOut", "Quart", 0.2, true, nil)
-			CMDsF.Visible = false
+			-- Verstecke Settings wenn Command Bar Fokus verliert
+			Settings:TweenPosition(UDim2.new(0, 0, 0, 300), "InOut", "Quart", 0.2, true, nil)
+			CMDsF.Visible = true
+			SettingsOpen = false
 		end
 	end
 	CMDsF.CanvasPosition = canvasPos
@@ -5819,7 +5829,8 @@ Cmdbar.Focused:Connect(function()
 	if SettingsOpen == true then
 		wait(0.2)
 		CMDsF.Visible = true
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.2, true, nil)
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 300), "InOut", "Quart", 0.2, true, nil) -- Verstecke Settings
+		SettingsOpen = false
 	end
 	tabComplete = UserInputService.InputBegan:Connect(function(input,gameProcessed)
 		if Cmdbar:IsFocused() then
