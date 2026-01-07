@@ -3278,8 +3278,9 @@ function maximizeHolder()
 		-- UI ist jetzt oben, zeige nur wenn nicht versteckt
 		local currentX = Holder.Position.X.Offset
 		local currentY = Holder.Position.Y.Offset
-		-- Nur maximieren wenn nicht bereits versteckt (minimizeNum)
-		if currentY >= minimizeNum then
+		-- Nur maximieren wenn UI bereits sichtbar ist (nicht versteckt)
+		-- Wenn versteckt, muss der Benutzer erst Prefix drücken oder Command Bar fokussieren
+		if currentY >= minimizeNum + 5 then -- +5 für Toleranz
 			Holder:TweenPosition(UDim2.new(0.5, 0, 0, 10), "InOut", "Quart", 0.2, true, nil)
 		end
 	end
@@ -3468,10 +3469,11 @@ IYMouse.KeyDown:Connect(function(Key)
 end)
 
 local lastMinimizeReq = 0
-Holder.MouseEnter:Connect(function()
-	lastMinimizeReq = 0
-	maximizeHolder()
-end)
+-- MouseEnter entfernt - UI soll nicht automatisch erscheinen
+-- Holder.MouseEnter:Connect(function()
+-- 	lastMinimizeReq = 0
+-- 	maximizeHolder()
+-- end)
 
 Holder.MouseLeave:Connect(function()
 	if not Cmdbar:IsFocused() then
@@ -3479,7 +3481,7 @@ Holder.MouseLeave:Connect(function()
 		lastMinimizeReq = reqTime
 		wait(1)
 		if lastMinimizeReq ~= reqTime then return end
-		if not Cmdbar:IsFocused() then
+		if not Cmdbar:IsFocused() and not StayOpen then
 			minimizeHolder()
 		end
 	end
@@ -4464,8 +4466,8 @@ IndexContents = function(str,bool,cmdbar,Ianim)
 				cmdbarHolder()
 			end
 		else
-			-- Nur maximieren wenn Command Bar fokussiert ist
-			if Cmdbar:IsFocused() then
+			-- Nur maximieren wenn Command Bar fokussiert ist UND UI bereits sichtbar
+			if Cmdbar:IsFocused() and Holder.Position.Y.Offset >= minimizeNum then
 				maximizeHolder()
 			end
 		end
@@ -5010,9 +5012,13 @@ for i = 1, #CMDs do
 	if CMDs[i].DESC ~= "" then
 		newcmd:SetAttribute("Title", CMDs[i].NAME)
 		newcmd:SetAttribute("Desc", CMDs[i].DESC)
-		newcmd.MouseButton1Down:Connect(function()
+				newcmd.MouseButton1Down:Connect(function()
 			if not IsOnMobile and newcmd.Visible and newcmd.TextTransparency == 0 then
 				local currentText = Cmdbar.Text
+				-- Zeige UI wenn Command angeklickt wird
+				if Holder.Position.Y.Offset < minimizeNum + 5 then
+					Holder:TweenPosition(UDim2.new(0.5, 0, 0, 10), "InOut", "Quart", 0.2, true, nil)
+				end
 				Cmdbar:CaptureFocus()
 				autoComplete(newcmd.Text, currentText)
 				maximizeHolder()
@@ -5361,6 +5367,10 @@ function addcmdtext(text,name,desc)
 		newcmd:SetAttribute("Desc", tooltipDesc)
 		newcmd.MouseButton1Down:Connect(function()
 			if newcmd.Visible and newcmd.TextTransparency == 0 then
+				-- Zeige UI wenn Command angeklickt wird
+				if Holder.Position.Y.Offset < minimizeNum + 5 then
+					Holder:TweenPosition(UDim2.new(0.5, 0, 0, 10), "InOut", "Quart", 0.2, true, nil)
+				end
 				Cmdbar:CaptureFocus()
 				autoComplete(newcmd.Text)
 				maximizeHolder()
@@ -7622,7 +7632,7 @@ addcmd('waypoints',{'positions'},function(args, speaker)
 	PositionsFrame:TweenPosition(UDim2.new(0, 0, 0, 0), "InOut", "Quart", 0.5, true, nil)
 	wait(0.5)
 	SettingsHolder.Visible = false
-	maximizeHolder()
+	-- maximizeHolder() entfernt - UI soll nicht automatisch erscheinen
 end)
 
 waypointParts = {}
@@ -13081,6 +13091,10 @@ if IsOnMobile then
 	UICorner.CornerRadius = UDim.new(0.5, 0)
 	UICorner.Parent = QuickCapture
 	QuickCapture.MouseButton1Click:Connect(function()
+		-- Zeige UI wenn QuickCapture geklickt wird
+		if Holder.Position.Y.Offset < minimizeNum + 5 then
+			Holder:TweenPosition(UDim2.new(0.5, 0, 0, 10), "InOut", "Quart", 0.2, true, nil)
+		end
 		Cmdbar:CaptureFocus()
 		maximizeHolder()
 	end)
