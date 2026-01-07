@@ -338,7 +338,7 @@ Holder.Parent = ScaledHolder
 Holder.Active = true
 Holder.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
 Holder.BorderSizePixel = 0
-Holder.Position = UDim2.new(0.5, 0, 0, 10) -- Oben zentriert
+Holder.Position = UDim2.new(0.5, 0, 0, -218) -- Startet minimiert/versteckt
 Holder.AnchorPoint = Vector2.new(0.5, 0)
 Holder.Size = UDim2.new(0, 300, 0, 240) -- Kompaktere Proportionen
 Holder.ZIndex = 10
@@ -3275,10 +3275,11 @@ end
 
 function maximizeHolder()
 	if StayOpen == false then
-		-- UI ist jetzt oben, behalte Y Position aber zeige vollständig
+		-- UI ist jetzt oben, zeige nur wenn nicht versteckt
 		local currentX = Holder.Position.X.Offset
 		local currentY = Holder.Position.Y.Offset
-		if currentY < 10 then
+		-- Nur maximieren wenn nicht bereits versteckt (minimizeNum)
+		if currentY >= minimizeNum then
 			Holder:TweenPosition(UDim2.new(0.5, 0, 0, 10), "InOut", "Quart", 0.2, true, nil)
 		end
 	end
@@ -3459,6 +3460,8 @@ end
 IYMouse.KeyDown:Connect(function(Key)
 	if (Key==prefix) then
 		RunService.RenderStepped:Wait()
+		-- Zeige UI wenn Prefix gedrückt wird
+		Holder:TweenPosition(UDim2.new(0.5, 0, 0, 10), "InOut", "Quart", 0.2, true, nil)
 		Cmdbar:CaptureFocus()
 		maximizeHolder()
 	end
@@ -3952,11 +3955,11 @@ end)
 
 SettingsButton.MouseButton1Click:Connect(function()
 	if SettingsOpen == false then SettingsOpen = true
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 45), "InOut", "Quart", 0.5, true, nil)
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 66), "InOut", "Quart", 0.5, true, nil)
 		CMDsF.Visible = false
 	else SettingsOpen = false
 		CMDsF.Visible = true
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 220), "InOut", "Quart", 0.5, true, nil)
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.5, true, nil)
 	end
 end)
 
@@ -4451,12 +4454,20 @@ IndexContents = function(str,bool,cmdbar,Ianim)
 	if not Ianim then
 		if indexnum == 0 or string.find(str, " ") then
 			if not cmdbar then
-				minimizeHolder()
+				-- Nur minimieren wenn Command Bar nicht fokussiert ist
+				if not Cmdbar:IsFocused() then
+					minimizeHolder()
+				else
+					cmdbarHolder()
+				end
 			elseif cmdbar then
 				cmdbarHolder()
 			end
 		else
-			maximizeHolder()
+			-- Nur maximieren wenn Command Bar fokussiert ist
+			if Cmdbar:IsFocused() then
+				maximizeHolder()
+			end
 		end
 	else
 		minimizeHolder()
@@ -4478,14 +4489,14 @@ task.spawn(function()
 				if SettingsOpen == true then
 					wait(0.2)
 					CMDsF.Visible = true
-					Settings:TweenPosition(UDim2.new(0, 0, 0, 220), "InOut", "Quart", 0.2, true, nil)
+					Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.2, true, nil)
 				end
 				IndexContents(PlayerGui.Chat.Frame.ChatBarParentFrame.Frame.BoxFrame.Frame.ChatBar.Text:lower():sub(2),true)
 			else
 				minimizeHolder()
 				if SettingsOpen == true then
 					wait(0.2)
-					Settings:TweenPosition(UDim2.new(0, 0, 0, 45), "InOut", "Quart", 0.2, true, nil)
+					Settings:TweenPosition(UDim2.new(0, 0, 0, 66), "InOut", "Quart", 0.2, true, nil)
 					CMDsF.Visible = false
 				end
 			end
@@ -5783,7 +5794,7 @@ Cmdbar.FocusLost:Connect(function(enterpressed)
 		IndexContents('',true,false,true)
 		if SettingsOpen == true then
 			wait(0.2)
-			Settings:TweenPosition(UDim2.new(0, 0, 0, 45), "InOut", "Quart", 0.2, true, nil)
+			Settings:TweenPosition(UDim2.new(0, 0, 0, 66), "InOut", "Quart", 0.2, true, nil)
 			CMDsF.Visible = false
 		end
 	end
@@ -5793,10 +5804,12 @@ end)
 Cmdbar.Focused:Connect(function()
 	historyCount = 0
 	canvasPos = CMDsF.CanvasPosition
+	-- Zeige UI wenn Command Bar fokussiert wird
+	Holder:TweenPosition(UDim2.new(0.5, 0, 0, 10), "InOut", "Quart", 0.2, true, nil)
 	if SettingsOpen == true then
 		wait(0.2)
 		CMDsF.Visible = true
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 220), "InOut", "Quart", 0.2, true, nil)
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.2, true, nil)
 	end
 	tabComplete = UserInputService.InputBegan:Connect(function(input,gameProcessed)
 		if Cmdbar:IsFocused() then
@@ -7600,7 +7613,7 @@ end)
 
 addcmd('waypoints',{'positions'},function(args, speaker)
 	if SettingsOpen == false then SettingsOpen = true
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 45), "InOut", "Quart", 0.5, true, nil)
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 66), "InOut", "Quart", 0.5, true, nil)
 		CMDsF.Visible = false
 	end
 	KeybindsFrame:TweenPosition(UDim2.new(0, 0, 0, 175), "InOut", "Quart", 0.5, true, nil)
