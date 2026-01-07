@@ -340,7 +340,7 @@ Holder.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
 Holder.BorderSizePixel = 0
 Holder.Position = UDim2.new(0.5, 0, 0, 10) -- Oben zentriert
 Holder.AnchorPoint = Vector2.new(0.5, 0)
-Holder.Size = UDim2.new(0, 280, 0, 280) -- Größer für mehr Commands
+Holder.Size = UDim2.new(0, 300, 0, 240) -- Kompaktere Proportionen
 Holder.ZIndex = 10
 table.insert(shade2,Holder)
 
@@ -361,9 +361,9 @@ Title.Parent = Holder
 Title.Active = true
 Title.BackgroundColor3 = Color3.fromRGB(25, 25, 27)
 Title.BorderSizePixel = 0
-Title.Size = UDim2.new(1, 0, 0, 32) -- Größerer Title Bar
+Title.Size = UDim2.new(1, 0, 0, 28) -- Kompakterer Title Bar
 Title.Font = Enum.Font.GothamSemibold
-Title.TextSize = 14
+Title.TextSize = 13
 Title.Text = "Infinite Yield FE v" .. currentVersion
 
 -- Rounded Corner für Title Bar
@@ -451,8 +451,8 @@ Dark.Parent = Holder
 Dark.Active = true
 Dark.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
 Dark.BorderSizePixel = 0
-Dark.Position = UDim2.new(0, 0, 0, 72) -- Angepasst an neue Position
-Dark.Size = UDim2.new(1, 0, 0, 180) -- Angepasst an neue Größe
+Dark.Position = UDim2.new(0, 0, 0, 66) -- Angepasst an neue Position
+Dark.Size = UDim2.new(1, 0, 0, 150) -- Angepasst an neue Größe
 Dark.ZIndex = 10
 table.insert(shade1,Dark)
 
@@ -461,8 +461,8 @@ Cmdbar.Parent = Holder
 Cmdbar.BackgroundTransparency = 0
 Cmdbar.BackgroundColor3 = Color3.fromRGB(20, 20, 22)
 Cmdbar.BorderSizePixel = 0
-Cmdbar.Position = UDim2.new(0, 10, 0, 38)
-Cmdbar.Size = UDim2.new(1, -20, 0, 28)
+Cmdbar.Position = UDim2.new(0, 10, 0, 34)
+Cmdbar.Size = UDim2.new(1, -20, 0, 26)
 Cmdbar.Font = Enum.Font.Gotham
 Cmdbar.TextSize = 13
 Cmdbar.TextXAlignment = Enum.TextXAlignment.Left
@@ -487,8 +487,8 @@ CMDsF.Name = "CMDs"
 CMDsF.Parent = Holder
 CMDsF.BackgroundTransparency = 1
 CMDsF.BorderSizePixel = 0
-CMDsF.Position = UDim2.new(0, 10, 0, 72)
-CMDsF.Size = UDim2.new(1, -20, 0, 180) -- Größer für mehr Commands
+CMDsF.Position = UDim2.new(0, 10, 0, 66)
+CMDsF.Size = UDim2.new(1, -20, 0, 150) -- Kompakter für bessere Proportionen
 CMDsF.ScrollBarImageColor3 = Color3.fromRGB(100, 100, 100)
 CMDsF.BottomImage = "rbxasset://textures/ui/Scroll/scroll-middle.png"
 CMDsF.CanvasSize = UDim2.new(0, 0, 0, 0)
@@ -511,7 +511,7 @@ SettingsButton.Name = "SettingsButton"
 SettingsButton.Parent = Holder
 SettingsButton.BackgroundTransparency = 1
 SettingsButton.Position = UDim2.new(1, -50, 0, 1)
-SettingsButton.Size = UDim2.new(0, 30, 0, 30)
+SettingsButton.Size = UDim2.new(0, 26, 0, 26)
 SettingsButton.Image = getcustomasset("infiniteyield/assets/settings.png")
 SettingsButton.ZIndex = 12
 
@@ -519,8 +519,8 @@ ReferenceButton = Instance.new("ImageButton")
 ReferenceButton.Name = "ReferenceButton"
 ReferenceButton.Parent = Holder
 ReferenceButton.BackgroundTransparency = 1
-ReferenceButton.Position = UDim2.new(1, -85, 0, 1)
-ReferenceButton.Size = UDim2.new(0, 30, 0, 30)
+ReferenceButton.Position = UDim2.new(1, -80, 0, 1)
+ReferenceButton.Size = UDim2.new(0, 26, 0, 26)
 ReferenceButton.Image = getcustomasset("infiniteyield/assets/reference.png")
 ReferenceButton.ZIndex = 12
 
@@ -529,8 +529,8 @@ Settings.Parent = Holder
 Settings.Active = true
 Settings.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
 Settings.BorderSizePixel = 0
-Settings.Position = UDim2.new(0, 0, 0, 280) -- Angepasst an neue Höhe
-Settings.Size = UDim2.new(0, 280, 0, 200) -- Größer
+Settings.Position = UDim2.new(0, 0, 0, 240) -- Angepasst an neue Höhe
+Settings.Size = UDim2.new(0, 300, 0, 180) -- Angepasst an neue Größe
 Settings.ZIndex = 10
 table.insert(shade1,Settings)
 
@@ -3284,7 +3284,7 @@ function maximizeHolder()
 	end
 end
 
-minimizeNum = -248 -- Nur Title Bar sichtbar
+minimizeNum = -218 -- Nur Title Bar sichtbar (28px Title Bar - 10px Offset = 18px sichtbar)
 function minimizeHolder()
 	if StayOpen == false then
 		local currentX = Holder.Position.X.Offset
