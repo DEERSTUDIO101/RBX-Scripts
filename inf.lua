@@ -340,7 +340,7 @@ Holder.BackgroundColor3 = Color3.fromRGB(30, 30, 32)
 Holder.BorderSizePixel = 0
 Holder.Position = UDim2.new(0.5, 0, 0, -218) -- Startet minimiert/versteckt
 Holder.AnchorPoint = Vector2.new(0.5, 0)
-Holder.Size = UDim2.new(0, 300, 0, 240) -- Kompaktere Proportionen
+Holder.Size = UDim2.new(0, 300, 0, 415) -- Größer für Command Bar oben + Settings unten (240 + 175)
 Holder.ZIndex = 10
 table.insert(shade2,Holder)
 
@@ -529,10 +529,10 @@ Settings.Parent = Holder
 Settings.Active = true
 Settings.BackgroundColor3 = Color3.fromRGB(36, 36, 37)
 Settings.BorderSizePixel = 0
-Settings.Position = UDim2.new(0, 0, 0, 300) -- Startet versteckt (außerhalb)
-Settings.Size = UDim2.new(0, 300, 0, 180) -- Angepasst an neue Größe
+Settings.Position = UDim2.new(0, 0, 0, 240) -- Unten wie in Originalversion
+Settings.Size = UDim2.new(0, 300, 0, 175) -- Originalgröße
 Settings.ZIndex = 10
-Settings.Visible = true -- Sichtbar, aber außerhalb
+Settings.Visible = true -- Immer sichtbar unten
 table.insert(shade1,Settings)
 
 -- Rounded Corner für Settings
@@ -3961,14 +3961,14 @@ end)
 SettingsButton.MouseButton1Click:Connect(function()
 	if SettingsOpen == false then 
 		SettingsOpen = true
-		-- Zeige Settings wenn Button geklickt wird
+		-- Zeige Settings über Command List (wie Original)
 		Settings:TweenPosition(UDim2.new(0, 0, 0, 66), "InOut", "Quart", 0.5, true, nil)
 		CMDsF.Visible = false
 	else 
 		SettingsOpen = false
 		CMDsF.Visible = true
-		-- Verstecke Settings wieder
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 300), "InOut", "Quart", 0.5, true, nil)
+		-- Settings zurück nach unten
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.5, true, nil)
 	end
 end)
 
@@ -4498,7 +4498,7 @@ task.spawn(function()
 				if SettingsOpen == true then
 					wait(0.2)
 					CMDsF.Visible = true
-					Settings:TweenPosition(UDim2.new(0, 0, 0, 300), "InOut", "Quart", 0.2, true, nil) -- Verstecke Settings
+					Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.2, true, nil) -- Settings zurück nach unten
 					SettingsOpen = false
 				end
 				IndexContents(PlayerGui.Chat.Frame.ChatBarParentFrame.Frame.BoxFrame.Frame.ChatBar.Text:lower():sub(2),true)
@@ -5812,8 +5812,8 @@ Cmdbar.FocusLost:Connect(function(enterpressed)
 		IndexContents('',true,false,true)
 		if SettingsOpen == true then
 			wait(0.2)
-			-- Verstecke Settings wenn Command Bar Fokus verliert
-			Settings:TweenPosition(UDim2.new(0, 0, 0, 300), "InOut", "Quart", 0.2, true, nil)
+			-- Settings zurück nach unten wenn Command Bar Fokus verliert
+			Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.2, true, nil)
 			CMDsF.Visible = true
 			SettingsOpen = false
 		end
@@ -5829,7 +5829,7 @@ Cmdbar.Focused:Connect(function()
 	if SettingsOpen == true then
 		wait(0.2)
 		CMDsF.Visible = true
-		Settings:TweenPosition(UDim2.new(0, 0, 0, 300), "InOut", "Quart", 0.2, true, nil) -- Verstecke Settings
+		Settings:TweenPosition(UDim2.new(0, 0, 0, 240), "InOut", "Quart", 0.2, true, nil) -- Settings zurück nach unten
 		SettingsOpen = false
 	end
 	tabComplete = UserInputService.InputBegan:Connect(function(input,gameProcessed)
