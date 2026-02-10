@@ -1,8 +1,15 @@
 {
-  "version": "1.8",
-  "date": "2026-02-10",
-  "features": [...],
-  "improvements": [...],
-  "bugfixes": [...],
-  "notes": "..."
+  "version": "1.8",           // Deine Version
+  "date": "2026-02-10",       // Release Datum
+  "features": [               // Array mit neuen Features
+    "Feature 1",
+    "Feature 2"
+  ],
+  "improvements": [           // Verbesserungen
+    "Improvement 1"
+  ],
+  "bugfixes": [              // Behobene Bugs
+    "Fixed bug 1"
+  ],
+  "notes": "Extra Notizen"   // Optionale Notizen
 }
