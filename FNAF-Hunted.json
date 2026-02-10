@@ -1,33 +1,8 @@
-Changelog - Five Nights: Hunted Script
-All notable changes to this project will be documented in this file.
-
-[v1.8] - 2026-02-10
-🎯 Major Features
-
-Auto Escape Auto-Detection: Automatically detects when you get captured and starts/stops A/D spam without manual input!
-
-Detects state changes: Dead → GettingUp → Running
-No more manual toggling during gameplay
-Smart detection with multiple fallback methods
-
-
-
-✨ New Features
-
-Added GitHub changelog integration in Info tab
-Real-time changelog loading from repository
-Version check system to compare with latest release
-Reload changelog button for instant updates
-
-🔧 Improvements
-
-Improved Auto Escape reliability with state tracking
-Enhanced minigame detection system
-Better notification timing and messages
-Optimized cache system performance
-
-🐛 Bug Fixes
-
-Fixed Auto Escape not stopping after escape
-Fixed false positives in minigame detection
-Improved error handling in Auto Heartbeat solver
+{
+  "version": "1.8",
+  "date": "2026-02-10",
+  "features": [...],
+  "improvements": [...],
+  "bugfixes": [...],
+  "notes": "..."
+}
