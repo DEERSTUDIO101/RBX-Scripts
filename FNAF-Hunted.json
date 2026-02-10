@@ -2,14 +2,19 @@
   "version": "1.8",
   "date": "2026-02-10",
   "features": [
-    "Feature 1",
-    "Feature 2"
+    "Auto Escape now has AUTOMATIC DETECTION - detects when captured and starts/stops automatically",
+    "Added GitHub-based changelog system",
+    "New cache system for better performance"
   ],
   "improvements": [
-    "Improvement 1"
+    "Optimized ESP rendering",
+    "Improved computer detection speed",
+    "Better minigame detection"
   ],
   "bugfixes": [
-    "Fixed bug 1"
+    "Fixed Auto Escape not stopping after escape",
+    "Fixed version number loading issue",
+    "Removed duplicate changelog code"
   ],
-  "notes": "Extra Notizen"
+  "notes": "Make sure to enable Auto Escape in the Player tab for automatic activation when captured!"
 }
