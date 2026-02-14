@@ -1,5 +1,5 @@
 {
-  "version": "1.9",
+  "version": "1.6",
   "date": "2026-02-10",
   "features": [
     "Auto Escape now has AUTOMATIC DETECTION - detects when captured and starts/stops automatically",
