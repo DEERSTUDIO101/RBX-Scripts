@@ -20,16 +20,17 @@ local Window = Rayfield:CreateWindow({
     KeySystem = false,
  })
  -------------------------------------------------------
- local Updatev = 1.8
+ local Updatev = 1.9
+ local GNum = 7
 --------------------------------------------------------
 
  local fTab = Window:CreateTab("Main", 7212066690)
  local fSection = fTab:CreateSection("Info")
  local fLabel = fTab:CreateLabel("This is just a script for random ass shieet :)", 7733975185, Color3.fromRGB(70, 31, 120), false)
- local fLabel = fTab:CreateLabel("Updated, Added 2 More Games", 7733975185, Color3.fromRGB(70, 31, 120), false)
+ local fLabel = fTab:CreateLabel("Updated, Added " ..GNum.." More Games", 7733975185, Color3.fromRGB(70, 31, 120), false)
  local fDropdown = fTab:CreateDropdown({
     Name = "Update",
-    Options = {"Hide the body" , "Tower of Zombies"},
+    Options = {"SCP 3008","Fnaf Eternal Nights","Fnaf Hunted","Hypershot","Gun Grounds FFA","Flick","Skill every sec"},
     CurrentOption = {Updatev},
     MultipleOptions = false,
     Flag = "VUpdates",
@@ -38,7 +39,7 @@ local Window = Rayfield:CreateWindow({
  })
  
 
- local dTab = Window:CreateTab("Random stuff", 5009915795) -- Title, Image
+ local dTab = Window:CreateTab("Random stuff", 5009915795)
  local dSection = dTab:CreateSection("😃")
  -- Speed Slider
 local speedSlider = dTab:CreateSlider({
@@ -488,235 +489,179 @@ dTab:CreateSlider({
 })
 
 --------------------------- [ This is the new script section under this :) ] ----------------------------------
-
 local sTab = Window:CreateTab("Scripts", 8425069718)
-local sSection = sTab:CreateSection("Scripts")
-local Button = sTab:CreateButton({
-    Name = "Simple Spy",
-    Callback = function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/infyiff/backup/main/SimpleSpyV3/main.lua"))()
-    end,
- })
- local Button = sTab:CreateButton({
-    Name = "Infinite Yield",
-    Callback = function()
-    loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()
-    end,
- })
- local Button = sTab:CreateButton({
-    Name = "FrostHub by Vanith",
-    Callback = function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/Snipez-Dev/Synap-Src/refs/heads/main/FrostHub"))()
-    end,
- })
- local Button = sTab:CreateButton({
-    Name = "Universal Hack by Homohack",
-    Callback = function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/dementiaenjoyer/homohack/main/loader.lua"))()
-    end,
- })
- local Button = sTab:CreateButton({
-    Name = "Cords Checker",
-    Callback = function()
-    loadstring(game:HttpGet("https://pastefy.app/5i0dxiYd/raw"))()
-    end,
- })
- if game.PlaceId == 4924922222 then 
-    local Button = sTab:CreateLabel("Brookhaven", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Mango Hub",
-    Callback = function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/rogelioajax/lua/main/MangoHub", true))()
-    end,
- })
- local Button = sTab:CreateButton({
-    Name = "Ice Hub new style (Orbit)",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/Waza80/scripts-new/main/IceHubBrookhaven.lua"))()
-    end,
- })
- local Button = sTab:CreateButton({
-    Name = "Salvatore",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/RFR-R1CH4RD/Loader/main/Salvatore.lua"))()
-    end,
- })
+local sSection = sTab:CreateSection("Scripts")  
+local gameConfigs = {
+    [4924922222] = {
+        label = "Brookhaven",
+        buttons = {
+            { name = "Mango Hub", url = "https://raw.githubusercontent.com/rogelioajax/lua/main/MangoHub" },
+            { name = "Ice Hub new style (Orbit)", url = "https://raw.githubusercontent.com/Waza80/scripts-new/main/IceHubBrookhaven.lua" },
+            { name = "Salvatore", url = "https://raw.githubusercontent.com/RFR-R1CH4RD/Loader/main/Salvatore.lua" },
+        }
+    },
+    [12673840215] = {
+        label = "Realistic hood test",
+        buttons = {
+            { name = "Realistic hood with Universal hitbox expander?", url = "https://raw.githubusercontent.com/YellowGregs/Loadstring/refs/heads/main/rhtestesting.lua" },
+        }
+    },
+    [12355337193] = {
+        label = "Realistic hood test",
+        buttons = {
+            { name = "Realistic hood with Universal hitbox expander?", url = "https://raw.githubusercontent.com/YellowGregs/Loadstring/refs/heads/main/rhtestesting.lua" },
+        }
+    },
+    [13864661000] = {
+        label = "Break In 2",
+        buttons = {
+            { name = "Break In 2 Starry", url = "https://luau.tech/build" },
+        }
+    },
+    [3851622790] = {
+        label = nil, -- kein Label
+        buttons = {
+            { name = "Break In DP Hub", url = "https://raw.githubusercontent.com/COOLXPLO/DP-HUB-coolxplo/refs/heads/main/BreakInStory.lua" },
+        }
+    },
+    [116495829188952] = {
+        label = "Dead Rails",
+        buttons = {
+            { name = "Airflow", url = "https://api.luarmor.net/files/v3/loaders/255ac567ced3dcb9e69aa7e44c423f19.lua" },
+            { name = "Kiciahook", url = "https://raw.githubusercontent.com/kiciahook/kiciahook/refs/heads/main/loader.lua" },
+        }
+    },
+    [6516141723] = {
+        label = "Doors",
+        buttons = {
+            { name = "Orbit by Waza80", url = "https://orbitsc.net/doors" },
+        }
+    },
+    [79546208627805] = {
+        label = "99 nights in the Forest",
+        buttons = {
+            { name = "Vape Voidware", url = "https://raw.githubusercontent.com/VapeVoidware/VWExtra/main/NightsInTheForest.lua" },
+            { name = "H4xScripts", url = "https://raw.githubusercontent.com/H4xScripts/Loader/refs/heads/main/loader.lua" },
+        }
+    },
+    [8073154099] = {
+        label = "The Intruder",
+        buttons = {
+            { name = "Unnamed Script", url = "https://pastebin.com/raw/FGjjwm6W" },
+        }
+    },
+    [14494334042] = {
+        label = "Get Fat and Roll Race",
+        buttons = {
+            { name = "Ln Hub", url = "https://raw.githubusercontent.com/No6No6No7yt/Lumin-Hub/main/FatRace.lua" },
+        }
+    },
+    [72966375942583] = {
+        label = "+1 SkillPoint Every Second",
+        buttons = {
+            { name = "Dynamic OMA", url = "https://raw.githubusercontent.com/DEERSTUDIO101/-1-SkillPoint-Every-Second/refs/heads/main/1spes.lua" },
+        }
+    },
+    [606849621] = {
+        label = "Jailbreak - Project Auto",
+        buttons = {
+            { name = "Auto Rob Crime", url = "https://scripts.projectauto.xyz/AutoRobV6" },
+            { name = "Auto Arrest Cops", url = "https://scripts.projectauto.xyz/AutoArrestV4" },
+        }
+    },
+    [98629859043211] = {
+        label = "M-E-G-Endless-Reality",
+        buttons = {
+            { name = "MEG HUB", url = "https://raw.githubusercontent.com/YegozovutSemyon/MEGHUB/refs/heads/main/source" },
+        }
+    },
+    [16154918775] = {
+        label = "Buckshot",
+        buttons = {
+            { name = "BUCKSHOT", url = "https://pastebin.com/raw/uRdcjnhJ" },
+        }
+    },
+    [920587237] = {
+        label = "Adopt me",
+        buttons = {
+            { name = "Prodigy X", url = "https://gitfront.io/r/ReQiuYTPL/wFUydaK74uGx/hub/raw/ReQiuYTPLHub.lua" },
+        }
+    },
+    [135880624242201] = {
+        label = "Cut trees",
+        buttons = {
+            { name = "kasumi Hub", url = "https://raw.githubusercontent.com/kasumichwan/scripts/refs/heads/main/kasumi-hub.lua" },
+        }
+    },
+    [292439477] = {
+        label = "Phantom Forces - Homohack",
+        buttons = {
+            { name = "PF - Homohack", url = "https://raw.githubusercontent.com/dementiaenjoyer/homohack/main/pf_lite.lua" },
+        }
+    },
+    [99122501338948] = {
+        label = "Tower of Zombies",
+        buttons = {
+            { name = "ToZ - Tora is me", url = "https://raw.githubusercontent.com/gumanba/Scripts/main/TowerofZombies" },
+        }
+    },
+    [81239378558719] = {
+        label = "Hide the body",
+        buttons = {
+            { name = "Hide the body", url = "https://pastefy.app/ULaWpxKm/raw" },
+        }
+    },
+    [1771130680955] = {
+        label = "Scp 3008",
+        buttons = {
+            { name = "Scp 3008", url = "https://raw.githubusercontent.com/DEERSTUDIO101/RBX-Scripts/refs/heads/main/scp%203008" },
+        }
+    },
+    [11392373641] = {
+        label = "Fnaf Eternal Nights",
+        buttons = {
+            { name = "FNAF Eternal Nights", url = "https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/Eternal%20Nights" },
+        }
+    },
+    [74161468227974] = {
+        label = "Fnaf Hunted",
+        buttons = {
+            { name = "FNAF Hunted", url = "https://vss.pandadevelopment.net/virtual/file/793a77dbabb14b6d" },
+        }
+    },
+    [17516596118] = {
+        label = "Hypershot",
+        buttons = {
+            { name = "Hypershot", url = "https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/Hypershot" },
+        }
+    },
+    [12137249458] = {
+        label = "Gun Grounds FFA",
+        buttons = {
+            { name = "Gun Grounds FFA", url = "https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/Gun%20Grounds%20FFA" },
+        }
+    },
+    [136801880565837] = {
+        label = "FPS Flick",
+        buttons = {
+            { name = "FPS Flick", url = "https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/FPS-Flick" },
+        }
+    },
+}
 
-elseif game.PlaceId == 12673840215 then
-    local Button = sTab:CreateLabel("Realistic hood test", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Realistic hood with Universal hitbox expander?",
-    Callback = function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/YellowGregs/Loadstring/refs/heads/main/rhtestesting.lua"))()
-    end,
- })
-elseif game.PlaceId == 12355337193 then
-    local Button = sTab:CreateLabel("Realistic hood test", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Realistic hood with Universal hitbox expander?",
-    Callback = function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/YellowGregs/Loadstring/refs/heads/main/rhtestesting.lua"))()
-    end,
- })
-elseif game.PlaceId == 13864661000 then
-    local Button = sTab:CreateLabel("Break In 2", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Break In 2 Starry",
-    Callback = function()
-        loadstring(game:HttpGet("https://luau.tech/build"))();
-    end,
- })
-elseif game.PlaceId == 3851622790 then
-local Button = sTab:CreateButton({
-    Name = "Break In DP Hub",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/COOLXPLO/DP-HUB-coolxplo/refs/heads/main/BreakInStory.lua"))()
-    end,
- })
-elseif game.PlaceId == 116495829188952 then
-    local Button = sTab:CreateLabel("Dead Rails", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Airflow",
-    Callback = function()
-        loadstring(game:HttpGet("https://api.luarmor.net/files/v3/loaders/255ac567ced3dcb9e69aa7e44c423f19.lua"))()
-    end,
- })
- local Button = sTab:CreateButton({
-    Name = "Kiciahook",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/kiciahook/kiciahook/refs/heads/main/loader.lua"))()
-    end,
- })
-elseif game.PlaceId == 6516141723 then
-    local Button = sTab:CreateLabel("Doors", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Orbit by Waza80",
-    Callback = function()
-        loadstring(game:HttpGet("https://orbitsc.net/doors"))()
-    end,
- })
-elseif game.PlaceId == 79546208627805 then
-    local Button = sTab:CreateButton({
-    Name = "Vape Voidware",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/VapeVoidware/VWExtra/main/NightsInTheForest.lua", true))()
-        Rayfield:Notify({
-    Title = "Vape Voidware",
-    Content = "works also in other games",
-    Duration = 4.5,
-    Image = 4483362458,
-})
-    end,
- })
-
-    local Button = sTab:CreateLabel("99 nights in the Forest", 7743871480, Color3.fromRGB(70, 31, 120), false)
- local Button = sTab:CreateButton({
-    Name = "H4xScripts",
-    Callback = function()
-    loadstring(game:HttpGet("https://raw.githubusercontent.com/H4xScripts/Loader/refs/heads/main/loader.lua", true))()
-Rayfield:Notify({
-    Title = "H4xScripts",
-    Content = "Consider Joining their discord, they do also nice stuff",
-    Duration = 4.5,
-    Image = 4483362458,
-})
-    end,
- })
-elseif game.PlaceId == 8073154099 then
-    local Button = sTab:CreateLabel("The Intruder", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Unnamed Script",
-    Callback = function()
-        loadstring(game:HttpGet("https://pastebin.com/raw/FGjjwm6W"))()
-    end,
- })
-elseif game.PlaceId == 14494334042 then
-    local Button = sTab:CreateLabel("Get Fat and Roll Race", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Ln Hub",
-    Callback = function()
-        loadstring(game:HttpGet('https://raw.githubusercontent.com/No6No6No7yt/Lumin-Hub/main/FatRace.lua'))();
-    end,
- })
-
-elseif game.PlaceId == 72966375942583 then
-    local Button = sTab:CreateLabel("+1 SkillPoint Every Second", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Dynamic OMA",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/DEERSTUDIO101/-1-SkillPoint-Every-Second/refs/heads/main/1spes.lua",true))() 
-    end,
- })
-elseif game.PlaceId == 606849621 then
-    local Button = sTab:CreateLabel("Jailbreak - Project Auto", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Auto Rob Crime",
-    Callback = function()
-        loadstring(game:HttpGet('https://scripts.projectauto.xyz/AutoRobV6'))()
-    end,
- })
- local Button = sTab:CreateButton({
-    Name = "Auto Arrest Cops",
-    Callback = function()
-        loadstring(game:HttpGet('https://scripts.projectauto.xyz/AutoArrestV4'))()
-    end,
- })
-elseif game.PlaceId == 98629859043211 then
-    local Button = sTab:CreateLabel("M-E-G-Endless-Reality", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "MEG HUB",
-    Callback = function()
-        loadstring(game:HttpGet('https://raw.githubusercontent.com/YegozovutSemyon/MEGHUB/refs/heads/main/source'))()
-    end,
- })
-elseif game.PlaceId == 16154918775 then
-    local Button = sTab:CreateLabel("Buckshot", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "BUCKSHOT",
-    Callback = function()
-        loadstring(game:HttpGet("https://pastebin.com/raw/uRdcjnhJ"))()
-    end,
- })
-elseif game.PlaceId == 920587237 then
-    local Button = sTab:CreateLabel("Adopt me", 7743871480, Color3.fromRGB(70, 31, 120), false) -- Title, Icon, Color, IgnoreTheme
-    local Button = sTab:CreateButton({
-    Name = "Prodigy X",
-    Callback = function()
-        loadstring(game:HttpGet('https://gitfront.io/r/ReQiuYTPL/wFUydaK74uGx/hub/raw/ReQiuYTPLHub.lua'))()
-    end,
- })
-elseif game.PlaceId == 135880624242201 then
-    local Button = sTab:CreateLabel("Cut trees", 7743871480, Color3.fromRGB(70, 31, 120), false)
-    local Button = sTab:CreateButton({
-    Name = "kasumi Hub",
-    Callback = function()
-        script_key = cuttreesadded
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/kasumichwan/scripts/refs/heads/main/kasumi-hub.lua"))()
-    end,
- })
-elseif game.PlaceId == 292439477 then
-    local Button = sTab:CreateLabel("Phantom Forces - Homohack", 7743871480, Color3.fromRGB(70, 31, 120), false)
-    local Button = sTab:CreateButton({
-    Name = "PF - Homohack",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/dementiaenjoyer/homohack/main/pf_lite.lua"))()
-    end,
- })
-elseif game.PlaceId == 99122501338948 then
-    local Button = sTab:CreateLabel("Tower of Zombies", 7743871480, Color3.fromRGB(70, 31, 120), false)
-    local Button = sTab:CreateButton({
-    Name = "ToZ - Tora is me",
-    Callback = function()
-        loadstring(game:HttpGet("https://raw.githubusercontent.com/gumanba/Scripts/main/TowerofZombies"))()
-    end,
- })
-elseif game.PlaceId == 81239378558719 then
-    local Button = sTab:CreateLabel("Hide the body", 7743871480, Color3.fromRGB(70, 31, 120), false)
-    local Button = sTab:CreateButton({
-    Name = "Hide the body",
-    Callback = function()
-        script_key = E4A53
-        loadstring(game:HttpGet("https://pastefy.app/ULaWpxKm/raw"))()
-    end,
- })
+local config = gameConfigs[game.PlaceId]
+if config then
+    if config.label then
+        sTab:CreateLabel(config.label, 7743871480, Color3.fromRGB(70, 31, 120), false)
+    end
+    for _, btn in ipairs(config.buttons) do
+        sTab:CreateButton({
+            Name = btn.name,
+            Callback = function()
+                loadstring(game:HttpGet(btn.url, true))()
+            end,
+        })
+    end
+else
+    print("PlaceId: " .. tostring(game.PlaceId))
 end
