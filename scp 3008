@@ -1,0 +1,851 @@
+-- Vanith | SCP 3008
+-- By Neuron X
+
+local Library = loadstring(game:HttpGet("https://raw.githubusercontent.com/xHeptc/Kavo-UI-Library/main/source.lua"))()
+local Window  = Library.CreateLib("Vanith | SCP 3008", "Ocean")
+
+-- ================================================
+-- Services
+-- ================================================
+
+local _Workspace   = game:GetService("Workspace")
+local _Players     = game:GetService("Players")
+local _RunService  = game:GetService("RunService")
+local _Lighting    = game:GetService("Lighting")
+local _CoreGui     = game:GetService("CoreGui")
+local _ProxService = game:GetService("ProximityPromptService")
+local UIS          = game:GetService("UserInputService")
+
+-- ================================================
+-- Globals
+-- ================================================
+
+local u1 = getgenv and getgenv() or (_G or shared)
+pcall(function()
+    if _CoreGui:FindFirstChild("InputPcToMobile") then
+        _CoreGui:FindFirstChild("InputPcToMobile"):Destroy()
+    end
+end)
+if not _CoreGui:FindFirstChild("Neu") then
+    local sg = Instance.new("ScreenGui")
+    sg.Parent = _CoreGui
+    sg.IgnoreGuiInset = true
+    u1.Neu = sg
+end
+
+local _LocalPlayer = _Players.LocalPlayer
+_LocalPlayer:WaitForChild("PlayerGui")
+
+local _Character = _LocalPlayer.Character
+local _Camera    = _Workspace:WaitForChild("Camera")
+_Workspace:WaitForChild("GameAI", 3)
+
+WC     = nil
+local Vec3           = Vector3.new
+local CF             = CFrame.new
+local Instancen      = Instance.new
+local pir            = pairs
+local IsA            = game.IsA
+local FindFirstChild = game.FindFirstChild
+local GetDescendants = game.GetDescendants
+local GetChildren    = game.GetChildren
+
+-- ================================================
+-- State
+-- ================================================
+
+local State = {
+    Noclip      = false,
+    Float       = false,
+    Fly         = false,
+    FlySpeed    = 1,
+    WalkSpeed   = 20,
+    WalkSpeedOn = false,
+    JumpPower   = 50,
+    JumpPowerOn = false,
+    NoFallDMG   = false,
+    NoCDPrompt  = false,
+    FullBright  = false,
+}
+
+-- ================================================
+-- Keybind debounce helper
+-- Kavo fires the callback every frame while held –
+-- this ensures it only fires ONCE per press.
+-- ================================================
+
+local _kbDebounce = {}
+local function kbDebounce(id, fn)
+    if _kbDebounce[id] then return end
+    _kbDebounce[id] = true
+    fn()
+    task.delay(0.25, function() _kbDebounce[id] = false end)
+end
+
+-- ================================================
+-- Mobile Fly Buttons (hidden by default)
+-- ================================================
+
+local _mobileGui = Instancen("ScreenGui")
+_mobileGui.Parent = _CoreGui
+_mobileGui.Name   = "VanithMobile"
+
+local u12 = { F=0, B=0, L=0, R=0, Q=0, E=0 }
+
+local mobileLayout = {
+    { name="W", pos=UDim2.new(0.5,0,0.72,0) },
+    { name="A", pos=UDim2.new(0.45,0,0.80,0) },
+    { name="S", pos=UDim2.new(0.5,0,0.88,0) },
+    { name="D", pos=UDim2.new(0.55,0,0.80,0) },
+}
+
+for _, btn in ipairs(mobileLayout) do
+    local b = Instancen("TextButton")
+    b.Parent             = _mobileGui
+    b.Name               = btn.name
+    b.Text               = btn.name
+    b.Size               = UDim2.new(0.04, 0, 0.07, 0)
+    b.Position           = btn.pos
+    b.BackgroundColor3   = Color3.fromRGB(30, 120, 180)
+    b.TextColor3         = Color3.fromRGB(255,255,255)
+    b.Font               = Enum.Font.GothamBold
+    b.TextScaled         = true
+    b.BackgroundTransparency = 0.3
+    b.Visible            = false
+    local corner = Instancen("UICorner", b)
+    corner.CornerRadius  = UDim.new(0.2, 0)
+
+    b.MouseButton1Down:Connect(function()
+        if btn.name=="W" then u12.F= State.FlySpeed
+        elseif btn.name=="S" then u12.B=-State.FlySpeed
+        elseif btn.name=="A" then u12.L=-State.FlySpeed
+        elseif btn.name=="D" then u12.R= State.FlySpeed end
+    end)
+    b.MouseButton1Up:Connect(function()
+        if btn.name=="W" then u12.F=0
+        elseif btn.name=="S" then u12.B=0
+        elseif btn.name=="A" then u12.L=0
+        elseif btn.name=="D" then u12.R=0 end
+    end)
+end
+
+local function setMobileVisible(v)
+    for _, c in ipairs(_mobileGui:GetChildren()) do
+        if c:IsA("TextButton") then c.Visible = v end
+    end
+end
+
+-- ================================================
+-- Waypoints
+-- ================================================
+
+local CFTable          = {}
+local CurrentName      = "Home"
+local SelectedWaypoint = nil
+
+-- ================================================
+-- ESP – Items
+-- ================================================
+
+if u1.ESPT == nil then u1.ESPT = {} end
+
+local function ESP(obj, color, size)
+    local b = Instancen("BoxHandleAdornment")
+    b.Color3           = color
+    b.AlwaysOnTop      = true
+    b.Size             = size
+    b.Transparency     = 0.5
+    b.Adornee          = obj
+    b.ZIndex           = 1
+    b.AdornCullingMode = Enum.AdornCullingMode.Never
+    b.Parent           = obj
+    table.insert(u1.ESPT, obj)
+end
+
+local function ClearESP()
+    for _, obj in pir(u1.ESPT) do
+        pcall(function()
+            if obj:FindFirstChild("BoxHandleAdornment") then
+                obj.BoxHandleAdornment:Destroy()
+            end
+        end)
+    end
+    u1.ESPT = {}
+end
+
+-- ================================================
+-- ESP – Player ESP
+-- ================================================
+
+local PlayerESPEnabled      = false
+local PlayerHighlights      = {}
+local PlFillColor           = Color3.fromRGB(0, 120, 255)
+local PlOutlineColor        = Color3.fromRGB(255, 255, 255)
+local PlFillTransparency    = 0.5
+local PlOutlineTransparency = 0
+local PlShowName            = true
+local PlShowDist            = true
+
+local function AddPlayerHighlight(plr)
+    if not plr or plr == _LocalPlayer then return end
+    if PlayerHighlights[plr] then return end
+
+    local function buildESP(char)
+        if not char then return end
+        -- remove old if char changed
+        pcall(function()
+            if PlayerHighlights[plr] then
+                PlayerHighlights[plr].hl:Destroy()
+                PlayerHighlights[plr].bb:Destroy()
+            end
+        end)
+
+        local hl = Instancen("Highlight")
+        hl.Adornee             = char
+        hl.FillColor           = PlFillColor
+        hl.OutlineColor        = PlOutlineColor
+        hl.FillTransparency    = PlFillTransparency
+        hl.OutlineTransparency = PlOutlineTransparency
+        hl.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
+        hl.Parent              = char
+
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+
+        local bb = Instancen("BillboardGui")
+        bb.Size        = UDim2.new(0, 150, 0, 50)
+        bb.StudsOffset = Vector3.new(0, 3, 0)
+        bb.AlwaysOnTop = true
+        bb.Adornee     = hrp
+        bb.Parent      = char
+
+        local nameL = Instancen("TextLabel")
+        nameL.Size                   = UDim2.new(1,0,0.55,0)
+        nameL.BackgroundTransparency = 1
+        nameL.Text                   = "👤 " .. plr.Name
+        nameL.TextColor3             = PlOutlineColor
+        nameL.TextStrokeColor3       = Color3.fromRGB(0,0,0)
+        nameL.TextStrokeTransparency = 0
+        nameL.TextScaled             = true
+        nameL.Font                   = Enum.Font.GothamBold
+        nameL.Parent                 = bb
+
+        local distL = Instancen("TextLabel")
+        distL.Size                   = UDim2.new(1,0,0.45,0)
+        distL.Position               = UDim2.new(0,0,0.55,0)
+        distL.BackgroundTransparency = 1
+        distL.TextColor3             = Color3.fromRGB(100, 210, 255)
+        distL.TextStrokeColor3       = Color3.fromRGB(0,0,0)
+        distL.TextStrokeTransparency = 0
+        distL.TextScaled             = true
+        distL.Font                   = Enum.Font.Gotham
+        distL.Text                   = "? studs"
+        distL.Parent                 = bb
+
+        PlayerHighlights[plr] = { hl=hl, bb=bb, distL=distL, nameL=nameL }
+    end
+
+    buildESP(plr.Character)
+    plr.CharacterAdded:Connect(function(char)
+        task.wait(0.1)
+        if PlayerESPEnabled then buildESP(char) end
+    end)
+end
+
+local function RemovePlayerHighlight(plr)
+    if PlayerHighlights[plr] then
+        pcall(function() PlayerHighlights[plr].hl:Destroy() end)
+        pcall(function() PlayerHighlights[plr].bb:Destroy() end)
+        PlayerHighlights[plr] = nil
+    end
+end
+
+local function ClearPlayerESP()
+    for plr in pir(PlayerHighlights) do RemovePlayerHighlight(plr) end
+    PlayerHighlights = {}
+end
+
+local function applyPlayerESP(enabled)
+    PlayerESPEnabled = enabled
+    if enabled then
+        for _, plr in ipairs(_Players:GetPlayers()) do
+            AddPlayerHighlight(plr)
+        end
+        _Players.PlayerAdded:Connect(function(plr)
+            if PlayerESPEnabled then AddPlayerHighlight(plr) end
+        end)
+        _Players.PlayerRemoving:Connect(function(plr)
+            RemovePlayerHighlight(plr)
+        end)
+    else
+        ClearPlayerESP()
+    end
+end
+
+-- Player ESP live update loop
+task.spawn(function()
+    while task.wait(0.1) do
+        if PlayerESPEnabled then
+            local myHRP = _LocalPlayer.Character and _LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            for plr, data in pir(PlayerHighlights) do
+                if plr and plr.Parent and plr.Character then
+                    local hrp = plr.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp and myHRP then
+                        local dist = math.floor((myHRP.Position - hrp.Position).Magnitude)
+                        data.distL.Text    = dist .. " studs"
+                    end
+                    data.hl.FillColor           = PlFillColor
+                    data.hl.OutlineColor        = PlOutlineColor
+                    data.hl.FillTransparency    = PlFillTransparency
+                    data.hl.OutlineTransparency = PlOutlineTransparency
+                    data.nameL.TextColor3       = PlOutlineColor
+                    -- show / hide name & dist
+                    data.nameL.Visible  = PlShowName
+                    data.distL.Visible  = PlShowDist
+                    data.bb.Enabled     = PlShowName or PlShowDist
+                else
+                    PlayerHighlights[plr] = nil
+                end
+            end
+        end
+    end
+end)
+
+-- ================================================
+-- ESP – Employee ESP
+-- ================================================
+
+local EmployeeESPEnabled     = false
+local EmployeeHighlights     = {}
+local EmpFillColor           = Color3.fromRGB(220, 50, 50)
+local EmpOutlineColor        = Color3.fromRGB(255, 255, 255)
+local EmpFillTransparency    = 0.5
+local EmpOutlineTransparency = 0
+local EmpShowName            = true
+local EmpShowDist            = true
+
+local function AddEmployeeHighlight(emp)
+    if not emp or not emp.Parent then return end
+    if EmployeeHighlights[emp] then return end
+
+    local hl = Instancen("Highlight")
+    hl.Adornee             = emp
+    hl.FillColor           = EmpFillColor
+    hl.OutlineColor        = EmpOutlineColor
+    hl.FillTransparency    = EmpFillTransparency
+    hl.OutlineTransparency = EmpOutlineTransparency
+    hl.DepthMode           = Enum.HighlightDepthMode.AlwaysOnTop
+    hl.Parent              = emp
+
+    local root = emp:FindFirstChild("HumanoidRootPart") or emp:FindFirstChildWhichIsA("BasePart")
+
+    local bb = Instancen("BillboardGui")
+    bb.Size        = UDim2.new(0, 140, 0, 50)
+    bb.StudsOffset = Vector3.new(0, 3.5, 0)
+    bb.AlwaysOnTop = true
+    bb.Adornee     = root
+    bb.Parent      = emp
+
+    local nameL = Instancen("TextLabel")
+    nameL.Size                   = UDim2.new(1,0,0.55,0)
+    nameL.BackgroundTransparency = 1
+    nameL.Text                   = "⚠ " .. emp.Name
+    nameL.TextColor3             = EmpOutlineColor
+    nameL.TextStrokeColor3       = Color3.fromRGB(0,0,0)
+    nameL.TextStrokeTransparency = 0
+    nameL.TextScaled             = true
+    nameL.Font                   = Enum.Font.GothamBold
+    nameL.Parent                 = bb
+
+    local distL = Instancen("TextLabel")
+    distL.Size                   = UDim2.new(1,0,0.45,0)
+    distL.Position               = UDim2.new(0,0,0.55,0)
+    distL.BackgroundTransparency = 1
+    distL.TextColor3             = Color3.fromRGB(255,210,0)
+    distL.TextStrokeColor3       = Color3.fromRGB(0,0,0)
+    distL.TextStrokeTransparency = 0
+    distL.TextScaled             = true
+    distL.Font                   = Enum.Font.Gotham
+    distL.Text                   = "? studs"
+    distL.Parent                 = bb
+
+    EmployeeHighlights[emp] = { hl=hl, bb=bb, distL=distL, nameL=nameL }
+end
+
+local function RemoveEmployeeHighlight(emp)
+    if EmployeeHighlights[emp] then
+        pcall(function() EmployeeHighlights[emp].hl:Destroy() end)
+        pcall(function() EmployeeHighlights[emp].bb:Destroy() end)
+        EmployeeHighlights[emp] = nil
+    end
+end
+
+local function ClearEmployeeESP()
+    for emp in pir(EmployeeHighlights) do RemoveEmployeeHighlight(emp) end
+    EmployeeHighlights = {}
+end
+
+local function applyEmployeeESP(enabled)
+    EmployeeESPEnabled = enabled
+    if enabled then
+        pcall(function()
+            for _, emp in pir(GetChildren(_Workspace.GameObjects.Physical.Employees)) do
+                AddEmployeeHighlight(emp)
+            end
+            _Workspace.GameObjects.Physical.Employees.ChildAdded:Connect(function(child)
+                if EmployeeESPEnabled then task.wait(0.1); AddEmployeeHighlight(child) end
+            end)
+        end)
+    else
+        ClearEmployeeESP()
+    end
+end
+
+-- Employee ESP live update loop
+task.spawn(function()
+    while task.wait(0.1) do
+        if EmployeeESPEnabled then
+            local myHRP = _LocalPlayer.Character and _LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            for emp, data in pir(EmployeeHighlights) do
+                if emp and emp.Parent then
+                    local root = emp:FindFirstChild("HumanoidRootPart") or emp:FindFirstChildWhichIsA("BasePart")
+                    if root and myHRP then
+                        local dist = math.floor((myHRP.Position - root.Position).Magnitude)
+                        data.distL.Text = dist .. " studs"
+                    end
+                    data.hl.FillColor           = EmpFillColor
+                    data.hl.OutlineColor        = EmpOutlineColor
+                    data.hl.FillTransparency    = EmpFillTransparency
+                    data.hl.OutlineTransparency = EmpOutlineTransparency
+                    data.nameL.TextColor3       = EmpOutlineColor
+                    -- show / hide name & dist
+                    data.nameL.Visible = EmpShowName
+                    data.distL.Visible = EmpShowDist
+                    data.bb.Enabled    = EmpShowName or EmpShowDist
+                else
+                    EmployeeHighlights[emp] = nil
+                end
+            end
+        end
+    end
+end)
+
+-- ================================================
+-- Feature Logic
+-- ================================================
+
+local function applyFallDamage(on)
+    State.NoFallDMG = on
+    pcall(function() _LocalPlayer.Character.FallDamage.Enabled = not on end)
+end
+
+local function applyNoCDPrompt(on)
+    State.NoCDPrompt = on
+end
+
+local function applyNoclip(on)
+    State.Noclip = on
+end
+
+local function applyFloat(on)
+    State.Float = on
+end
+
+local function applyWalkSpeed(on)
+    State.WalkSpeedOn = on
+    if not on and WC ~= nil then WC:Disconnect(); WC = nil end
+end
+
+local function applyJumpPower(on)
+    State.JumpPowerOn = on
+end
+
+-- FullBright
+local _fbSaved = nil
+local function applyFullBright(on)
+    State.FullBright = on
+    if on then
+        if not _fbSaved then
+            _fbSaved = {
+                Brightness=_Lighting.Brightness, ClockTime=_Lighting.ClockTime,
+                FogEnd=_Lighting.FogEnd, GlobalShadows=_Lighting.GlobalShadows,
+                Ambient=_Lighting.Ambient
+            }
+        end
+        _Lighting.Brightness=1; _Lighting.ClockTime=12; _Lighting.FogEnd=786543
+        _Lighting.GlobalShadows=false; _Lighting.Ambient=Color3.fromRGB(178,178,178)
+    else
+        if _fbSaved then
+            _Lighting.Brightness=_fbSaved.Brightness; _Lighting.ClockTime=_fbSaved.ClockTime
+            _Lighting.FogEnd=_fbSaved.FogEnd; _Lighting.GlobalShadows=_fbSaved.GlobalShadows
+            _Lighting.Ambient=_fbSaved.Ambient
+        end
+    end
+end
+
+-- Fly
+local FLYING = false
+local function startFly()
+    FLYING=true; State.Fly=true
+    pcall(function()
+        local hrp = _Character.HumanoidRootPart
+        local bg  = Instancen("BodyGyro",     hrp)
+        local bv  = Instancen("BodyVelocity", hrp)
+        bg.P=90000; bg.maxTorque=Vec3(9e9,9e9,9e9); bg.cframe=hrp.CFrame
+        bv.velocity=Vec3(0,0,0); bv.maxForce=Vec3(9e9,9e9,9e9)
+
+        task.spawn(function()
+            while FLYING do
+                local spd = (u12.L+u12.R~=0 or u12.F+u12.B~=0 or u12.Q+u12.E~=0) and 50 or 0
+                if spd ~= 0 then
+                    bv.velocity = (
+                        _Camera.CoordinateFrame.lookVector*(u12.F+u12.B) +
+                        _Camera.CoordinateFrame*CF(u12.L+u12.R,(u12.F+u12.B+u12.Q+u12.E)*0.2,0).p -
+                        _Camera.CoordinateFrame.p
+                    ) * spd
+                else
+                    bv.velocity = Vec3(0,0,0)
+                end
+                bg.cframe = _Camera.CoordinateFrame
+                task.wait()
+            end
+            u12={F=0,B=0,L=0,R=0,Q=0,E=0}
+            bg:Destroy(); bv:Destroy()
+            _Character.Humanoid.PlatformStand = false
+        end)
+
+        local mouse = _LocalPlayer:GetMouse()
+        mouse.KeyDown:connect(function(k)
+            k=k:lower()
+            if     k=="w" then u12.F= State.FlySpeed
+            elseif k=="s" then u12.B=-State.FlySpeed
+            elseif k=="a" then u12.L=-State.FlySpeed
+            elseif k=="d" then u12.R= State.FlySpeed
+            elseif k=="y" then u12.Q= State.FlySpeed*2
+            elseif k=="t" then u12.E=-State.FlySpeed*2 end
+        end)
+        mouse.KeyUp:connect(function(k)
+            k=k:lower()
+            if k=="w" then u12.F=0 elseif k=="s" then u12.B=0
+            elseif k=="a" then u12.L=0 elseif k=="d" then u12.R=0
+            elseif k=="y" then u12.Q=0 elseif k=="t" then u12.E=0 end
+        end)
+    end)
+end
+local function applyFly(on)
+    if on then startFly() else FLYING=false; State.Fly=false end
+end
+
+-- ================================================
+-- TABS
+-- ================================================
+
+local MainTab     = Window:NewTab("Main")
+local PlayerTab   = Window:NewTab("Player")
+local ESPTab      = Window:NewTab("ESP")
+local WaypointTab = Window:NewTab("Waypoint")
+local UITab       = Window:NewTab("UI")
+
+-- ================================================
+-- MAIN TAB
+-- ================================================
+
+local FeaturesSection = MainTab:NewSection("Features")
+
+local toggleFallDMG = FeaturesSection:NewToggle("Disable Fall Damage", "Disables fall damage", function(on)
+    applyFallDamage(on)
+end)
+FeaturesSection:NewKeybind("Fall Damage Keybind", "Toggle fall damage", Enum.KeyCode.Unknown, function()
+    kbDebounce("FallDMG", function()
+        applyFallDamage(not State.NoFallDMG)
+        toggleFallDMG:UpdateToggle(State.NoFallDMG and "Fall Damage [ON]" or "Fall Damage [OFF]")
+    end)
+end)
+
+local toggleNCD = FeaturesSection:NewToggle("Instant Press (No CD Prompt)", "Removes hold duration", function(on)
+    applyNoCDPrompt(on)
+end)
+FeaturesSection:NewKeybind("No CD Prompt Keybind", "Toggle instant press", Enum.KeyCode.Unknown, function()
+    kbDebounce("NCD", function()
+        applyNoCDPrompt(not State.NoCDPrompt)
+        toggleNCD:UpdateToggle(State.NoCDPrompt and "Instant Press [ON]" or "Instant Press [OFF]")
+    end)
+end)
+
+local toggleFB = FeaturesSection:NewToggle("Full Bright", "Toggle full brightness", function(on)
+    applyFullBright(on)
+end)
+FeaturesSection:NewKeybind("Full Bright Keybind", "Toggle fullbright", Enum.KeyCode.B, function()
+    kbDebounce("FB", function()
+        applyFullBright(not State.FullBright)
+        toggleFB:UpdateToggle(State.FullBright and "Full Bright [ON]" or "Full Bright [OFF]")
+    end)
+end)
+
+-- ================================================
+-- PLAYER TAB
+-- ================================================
+
+local PlayerSection = PlayerTab:NewSection("Player Settings")
+
+local toggleNoclip = PlayerSection:NewToggle("Noclip", "Walk through walls", function(on)
+    applyNoclip(on)
+end)
+PlayerSection:NewKeybind("Noclip Keybind", "Toggle noclip", Enum.KeyCode.N, function()
+    kbDebounce("Noclip", function()
+        applyNoclip(not State.Noclip)
+        toggleNoclip:UpdateToggle(State.Noclip and "Noclip [ON]" or "Noclip [OFF]")
+    end)
+end)
+
+local toggleFloat = PlayerSection:NewToggle("Float", "Float above ground", function(on)
+    applyFloat(on)
+end)
+PlayerSection:NewKeybind("Float Keybind", "Toggle float", Enum.KeyCode.F, function()
+    kbDebounce("Float", function()
+        applyFloat(not State.Float)
+        toggleFloat:UpdateToggle(State.Float and "Float [ON]" or "Float [OFF]")
+    end)
+end)
+
+PlayerSection:NewSlider("WalkSpeed", "Set walk speed", 300, 1, function(s)
+    State.WalkSpeed = s
+end)
+local toggleWS = PlayerSection:NewToggle("Toggle WalkSpeed", "Apply walk speed", function(on)
+    applyWalkSpeed(on)
+end)
+PlayerSection:NewKeybind("WalkSpeed Keybind", "Toggle walkspeed", Enum.KeyCode.X, function()
+    kbDebounce("WS", function()
+        applyWalkSpeed(not State.WalkSpeedOn)
+        toggleWS:UpdateToggle(State.WalkSpeedOn and "WalkSpeed [ON]" or "WalkSpeed [OFF]")
+    end)
+end)
+
+PlayerSection:NewSlider("JumpPower", "Set jump power", 300, 1, function(s)
+    State.JumpPower = s
+end)
+local toggleJP = PlayerSection:NewToggle("Toggle JumpPower", "Apply jump power", function(on)
+    applyJumpPower(on)
+end)
+PlayerSection:NewKeybind("JumpPower Keybind", "Toggle jumppower", Enum.KeyCode.J, function()
+    kbDebounce("JP", function()
+        applyJumpPower(not State.JumpPowerOn)
+        toggleJP:UpdateToggle(State.JumpPowerOn and "JumpPower [ON]" or "JumpPower [OFF]")
+    end)
+end)
+
+PlayerSection:NewSlider("Fly Speed", "Set fly speed", 10, 1, function(s)
+    State.FlySpeed = s
+end)
+local toggleFly = PlayerSection:NewToggle("Fly", "Enable flight", function(on)
+    applyFly(on)
+end)
+PlayerSection:NewKeybind("Fly Keybind", "Toggle fly", Enum.KeyCode.G, function()
+    kbDebounce("Fly", function()
+        applyFly(not State.Fly)
+        toggleFly:UpdateToggle(State.Fly and "Fly [ON]" or "Fly [OFF]")
+    end)
+end)
+
+-- ================================================
+-- ESP TAB
+-- ================================================
+
+-- Items ESP
+local ItemsSection = ESPTab:NewSection("Items ESP")
+
+ItemsSection:NewButton("ESP Items", "Highlight items", function()
+    pcall(function()
+        for _, v in pir(GetChildren(_Workspace.GameObjects.Physical.Items)) do
+            if v then ESP(v, Color3.fromRGB(0,255,100), Vec3(2,2,2)) end
+        end
+    end)
+end)
+ItemsSection:NewButton("Clear All Item ESP", "Remove item highlights", function()
+    ClearESP()
+end)
+
+-- Player ESP
+local PlSection = ESPTab:NewSection("Player ESP")
+
+local togglePlESP = PlSection:NewToggle("Player ESP", "Highlight all players", function(on)
+    applyPlayerESP(on)
+end)
+PlSection:NewKeybind("Player ESP Keybind", "Toggle player ESP", Enum.KeyCode.P, function()
+    kbDebounce("PlESP", function()
+        applyPlayerESP(not PlayerESPEnabled)
+        togglePlESP:UpdateToggle(PlayerESPEnabled and "Player ESP [ON]" or "Player ESP [OFF]")
+    end)
+end)
+PlSection:NewColorPicker("Player Fill Color", "Fill color", Color3.fromRGB(0,120,255), function(c)
+    PlFillColor = c
+end)
+PlSection:NewColorPicker("Player Outline Color", "Outline color", Color3.fromRGB(255,255,255), function(c)
+    PlOutlineColor = c
+end)
+PlSection:NewSlider("Player Fill Transparency", "0=solid  100=invisible", 100, 0, function(s)
+    PlFillTransparency = s/100
+end)
+PlSection:NewToggle("Show Player Name", "Show/hide name label", function(on)
+    PlShowName = on
+end)
+-- default ON: call immediately so state matches
+PlShowName = true
+
+PlSection:NewToggle("Show Player Distance", "Show/hide distance label", function(on)
+    PlShowDist = on
+end)
+PlShowDist = true
+PlSection:NewButton("Clear Player ESP", "Remove all player highlights", function()
+    applyPlayerESP(false)
+    togglePlESP:UpdateToggle("Player ESP [OFF]")
+end)
+
+-- Employee ESP
+local EmpSection = ESPTab:NewSection("Employee ESP")
+
+local toggleEmpESP = EmpSection:NewToggle("Employee ESP", "Highlight employees", function(on)
+    applyEmployeeESP(on)
+end)
+EmpSection:NewKeybind("Employee ESP Keybind", "Toggle employee ESP", Enum.KeyCode.H, function()
+    kbDebounce("EmpESP", function()
+        applyEmployeeESP(not EmployeeESPEnabled)
+        toggleEmpESP:UpdateToggle(EmployeeESPEnabled and "Employee ESP [ON]" or "Employee ESP [OFF]")
+    end)
+end)
+EmpSection:NewColorPicker("Employee Fill Color", "Fill color", Color3.fromRGB(220,50,50), function(c)
+    EmpFillColor = c
+end)
+EmpSection:NewColorPicker("Employee Outline Color", "Outline color", Color3.fromRGB(255,255,255), function(c)
+    EmpOutlineColor = c
+end)
+EmpSection:NewSlider("Fill Transparency", "0=solid  100=invisible", 100, 0, function(s)
+    EmpFillTransparency = s/100
+end)
+EmpSection:NewSlider("Outline Transparency", "0=solid  100=invisible", 100, 0, function(s)
+    EmpOutlineTransparency = s/100
+end)
+EmpSection:NewToggle("Show Employee Name", "Show/hide name label", function(on)
+    EmpShowName = on
+end)
+EmpShowName = true
+
+EmpSection:NewToggle("Show Employee Distance", "Show/hide distance label", function(on)
+    EmpShowDist = on
+end)
+EmpShowDist = true
+EmpSection:NewButton("Refresh Employee ESP", "Re-scan for employees", function()
+    ClearEmployeeESP()
+    if EmployeeESPEnabled then applyEmployeeESP(true) end
+end)
+EmpSection:NewButton("Clear Employee ESP", "Remove all highlights", function()
+    applyEmployeeESP(false)
+    toggleEmpESP:UpdateToggle("Employee ESP [OFF]")
+end)
+
+-- ================================================
+-- WAYPOINT TAB
+-- ================================================
+
+local WaypointSection = WaypointTab:NewSection("Waypoints")
+
+WaypointSection:NewTextBox("Waypoint Name", "Enter name", function(txt)
+    CurrentName = txt
+end)
+WaypointSection:NewButton("Add Waypoint", "Save current position", function()
+    CFTable[CurrentName] = _LocalPlayer.Character.HumanoidRootPart.CFrame
+end)
+
+local WaypointDropdown
+WaypointDropdown = WaypointSection:NewDropdown("Select Waypoint", "Choose a waypoint", {"nil"}, function(opt)
+    SelectedWaypoint = CFTable[opt]
+end)
+WaypointSection:NewButton("Refresh Waypoints", "Update dropdown", function()
+    local list = {}
+    for name in pir(CFTable) do table.insert(list, name); task.wait() end
+    if #list == 0 then list = {"nil"} end
+    WaypointDropdown:Refresh(list)
+end)
+WaypointSection:NewButton("Teleport", "Go to selected waypoint", function()
+    if SelectedWaypoint then
+        _LocalPlayer.Character.HumanoidRootPart.CFrame = SelectedWaypoint
+    end
+end)
+
+-- ================================================
+-- UI TAB
+-- ================================================
+
+local UISection = UITab:NewSection("UI Settings")
+
+UISection:NewKeybind("Hide / Show UI", "Toggle UI visibility", Enum.KeyCode.Y, function()
+    kbDebounce("HideUI", function()
+        Library:ToggleUI()
+    end)
+end)
+
+UISection:NewToggle("Mobile Fly Buttons", "Show on-screen fly buttons", function(on)
+    setMobileVisible(on)
+end)
+
+-- ================================================
+-- SYSTEM LOOP
+-- ================================================
+
+if not u1.DisableSystem then
+
+    _RunService.Stepped:Connect(function()
+        _Character = _LocalPlayer.Character
+
+        -- Noclip
+        if State.Noclip and _Character then
+            for _, p in pir(GetDescendants(_Character)) do
+                if IsA(p, "BasePart") then p.CanCollide = false end
+            end
+        end
+    end)
+
+    -- Float platform part
+    if not FindFirstChild(_Workspace, "selcRootX") then
+        local pt = Instancen("Part")
+        pt.Size=Vec3(2,0.2,1.5); pt.Material=Enum.Material.Grass
+        pt.Anchored=true; pt.Transparency=1; pt.CanCollide=true
+        pt.Parent=_Workspace; pt.Name="selcRootX"
+    end
+
+    task.wait()
+
+    UFPart = FindFirstChild(_Workspace, "selcRootX")
+
+    _RunService.RenderStepped:Connect(function()
+        local hrp = _Character and FindFirstChild(_Character, "HumanoidRootPart")
+
+        -- Float
+        if UFPart and hrp and State.Float then
+            UFPart.CFrame = hrp.CFrame * CF(0, -3.1, 0)
+        elseif UFPart then
+            UFPart.CFrame = CF(0, -10000, 0)
+        end
+
+        -- JumpPower
+        if State.JumpPowerOn and _Character and FindFirstChild(_Character,"Humanoid") then
+            _Character.Humanoid.JumpPower = State.JumpPower
+        end
+
+        -- WalkSpeed
+        if State.WalkSpeedOn and _Character and FindFirstChild(_Character,"Humanoid") then
+            _Character.Humanoid.WalkSpeed = State.WalkSpeed
+            if WC == nil then
+                WC = _Character.Humanoid:GetPropertyChangedSignal("WalkSpeed"):Connect(function()
+                    _Character.Humanoid.WalkSpeed = State.WalkSpeed
+                end)
+            end
+        end
+    end)
+
+    _ProxService.PromptShown:Connect(function(prompt)
+        if State.NoCDPrompt then
+            prompt.HoldDuration        = 0
+            prompt.RequiresLineOfSight = false
+        end
+    end)
+end
