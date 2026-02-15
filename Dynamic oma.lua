@@ -38,13 +38,6 @@ local Window = Rayfield:CreateWindow({
     end,
  })
 
- local Button = dTab:CreateButton({
-   Name = "Destroy UI",
-   Callback = function()
-   Rayfield:Destroy()
-   end,
-})
-
  local dTab = Window:CreateTab("Random stuff", 5009915795)
  local dSection = dTab:CreateSection("😃")
  -- Speed Slider
@@ -493,6 +486,15 @@ dTab:CreateSlider({
         RefreshESP()
     end
 })
+
+-- hier direkt danach
+fTab:CreateButton({
+    Name = "Destroy UI",
+    Callback = function()
+        Rayfield:Destroy()
+    end,
+})
+
 -- GAME-SPECIFIC SCRIPTS (aus JSON)
 local sTab = Window:CreateTab("Script")
 local sSection = sTab:CreateSection("Scripts")
