@@ -37,7 +37,13 @@ local Window = Rayfield:CreateWindow({
     Callback = function(Options)
     end,
  })
- 
+
+ local Button = dTab:CreateButton({
+   Name = "Destroy UI",
+   Callback = function()
+   Rayfield:Destroy()
+   end,
+})
 
  local dTab = Window:CreateTab("Random stuff", 5009915795)
  local dSection = dTab:CreateSection("😃")
