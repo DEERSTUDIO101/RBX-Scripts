@@ -487,181 +487,47 @@ dTab:CreateSlider({
         RefreshESP()
     end
 })
+-- GAME-SPECIFIC SCRIPTS (aus JSON)
+local sTab = Window:CreateTab("Script")
+local sSection = sTab:CreateSection("Scripts")
+sTab:CreateButton({Name = "Infinite Yield", Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"))()
+end})
 
---------------------------- [ This is the new script section under this :) ] ----------------------------------
-local sTab = Window:CreateTab("Scripts", 8425069718)
-local sSection = sTab:CreateSection("Scripts")  
-local gameConfigs = {
-    [4924922222] = {
-        label = "Brookhaven",
-        buttons = {
-            { name = "Mango Hub", url = "https://raw.githubusercontent.com/rogelioajax/lua/main/MangoHub" },
-            { name = "Ice Hub new style (Orbit)", url = "https://raw.githubusercontent.com/Waza80/scripts-new/main/IceHubBrookhaven.lua" },
-            { name = "Salvatore", url = "https://raw.githubusercontent.com/RFR-R1CH4RD/Loader/main/Salvatore.lua" },
-        }
-    },
-    [12673840215] = {
-        label = "Realistic hood test",
-        buttons = {
-            { name = "Realistic hood with Universal hitbox expander?", url = "https://raw.githubusercontent.com/YellowGregs/Loadstring/refs/heads/main/rhtestesting.lua" },
-        }
-    },
-    [12355337193] = {
-        label = "Realistic hood test",
-        buttons = {
-            { name = "Realistic hood with Universal hitbox expander?", url = "https://raw.githubusercontent.com/YellowGregs/Loadstring/refs/heads/main/rhtestesting.lua" },
-        }
-    },
-    [13864661000] = {
-        label = "Break In 2",
-        buttons = {
-            { name = "Break In 2 Starry", url = "https://luau.tech/build" },
-        }
-    },
-    [3851622790] = {
-        label = nil, -- kein Label
-        buttons = {
-            { name = "Break In DP Hub", url = "https://raw.githubusercontent.com/COOLXPLO/DP-HUB-coolxplo/refs/heads/main/BreakInStory.lua" },
-        }
-    },
-    [116495829188952] = {
-        label = "Dead Rails",
-        buttons = {
-            { name = "Airflow", url = "https://api.luarmor.net/files/v3/loaders/255ac567ced3dcb9e69aa7e44c423f19.lua" },
-            { name = "Kiciahook", url = "https://raw.githubusercontent.com/kiciahook/kiciahook/refs/heads/main/loader.lua" },
-        }
-    },
-    [6516141723] = {
-        label = "Doors",
-        buttons = {
-            { name = "Orbit by Waza80", url = "https://orbitsc.net/doors" },
-        }
-    },
-    [79546208627805] = {
-        label = "99 nights in the Forest",
-        buttons = {
-            { name = "Vape Voidware", url = "https://raw.githubusercontent.com/VapeVoidware/VWExtra/main/NightsInTheForest.lua" },
-            { name = "H4xScripts", url = "https://raw.githubusercontent.com/H4xScripts/Loader/refs/heads/main/loader.lua" },
-        }
-    },
-    [8073154099] = {
-        label = "The Intruder",
-        buttons = {
-            { name = "Unnamed Script", url = "https://pastebin.com/raw/FGjjwm6W" },
-        }
-    },
-    [14494334042] = {
-        label = "Get Fat and Roll Race",
-        buttons = {
-            { name = "Ln Hub", url = "https://raw.githubusercontent.com/No6No6No7yt/Lumin-Hub/main/FatRace.lua" },
-        }
-    },
-    [72966375942583] = {
-        label = "+1 SkillPoint Every Second",
-        buttons = {
-            { name = "Dynamic OMA", url = "https://raw.githubusercontent.com/DEERSTUDIO101/-1-SkillPoint-Every-Second/refs/heads/main/1spes.lua" },
-        }
-    },
-    [606849621] = {
-        label = "Jailbreak - Project Auto",
-        buttons = {
-            { name = "Auto Rob Crime", url = "https://scripts.projectauto.xyz/AutoRobV6" },
-            { name = "Auto Arrest Cops", url = "https://scripts.projectauto.xyz/AutoArrestV4" },
-        }
-    },
-    [98629859043211] = {
-        label = "M-E-G-Endless-Reality",
-        buttons = {
-            { name = "MEG HUB", url = "https://raw.githubusercontent.com/YegozovutSemyon/MEGHUB/refs/heads/main/source" },
-        }
-    },
-    [16154918775] = {
-        label = "Buckshot",
-        buttons = {
-            { name = "BUCKSHOT", url = "https://pastebin.com/raw/uRdcjnhJ" },
-        }
-    },
-    [920587237] = {
-        label = "Adopt me",
-        buttons = {
-            { name = "Prodigy X", url = "https://gitfront.io/r/ReQiuYTPL/wFUydaK74uGx/hub/raw/ReQiuYTPLHub.lua" },
-        }
-    },
-    [135880624242201] = {
-        label = "Cut trees",
-        buttons = {
-            { name = "kasumi Hub", url = "https://raw.githubusercontent.com/kasumichwan/scripts/refs/heads/main/kasumi-hub.lua" },
-        }
-    },
-    [292439477] = {
-        label = "Phantom Forces - Homohack",
-        buttons = {
-            { name = "PF - Homohack", url = "https://raw.githubusercontent.com/dementiaenjoyer/homohack/main/pf_lite.lua" },
-        }
-    },
-    [99122501338948] = {
-        label = "Tower of Zombies",
-        buttons = {
-            { name = "ToZ - Tora is me", url = "https://raw.githubusercontent.com/gumanba/Scripts/main/TowerofZombies" },
-        }
-    },
-    [81239378558719] = {
-        label = "Hide the body",
-        buttons = {
-            { name = "Hide the body", url = "https://pastefy.app/ULaWpxKm/raw" },
-        }
-    },
-    [1771130680955] = {
-        label = "Scp 3008",
-        buttons = {
-            { name = "Scp 3008", url = "https://raw.githubusercontent.com/DEERSTUDIO101/RBX-Scripts/refs/heads/main/scp%203008" },
-        }
-    },
-    [11392373641] = {
-        label = "Fnaf Eternal Nights",
-        buttons = {
-            { name = "FNAF Eternal Nights", url = "https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/Eternal%20Nights" },
-        }
-    },
-    [74161468227974] = {
-        label = "Fnaf Hunted",
-        buttons = {
-            { name = "FNAF Hunted", url = "https://vss.pandadevelopment.net/virtual/file/793a77dbabb14b6d" },
-        }
-    },
-    [17516596118] = {
-        label = "Hypershot",
-        buttons = {
-            { name = "Hypershot", url = "https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/Hypershot" },
-        }
-    },
-    [12137249458] = {
-        label = "Gun Grounds FFA",
-        buttons = {
-            { name = "Gun Grounds FFA", url = "https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/Gun%20Grounds%20FFA" },
-        }
-    },
-    [136801880565837] = {
-        label = "FPS Flick",
-        buttons = {
-            { name = "FPS Flick", url = "https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/FPS-Flick" },
-        }
-    },
-}
+sTab:CreateButton({Name = "Remote Spy", Callback = function()
+    loadstring(game:HttpGet("https://github.com/richie0866/remote-spy/releases/latest/download/RemoteSpy.lua"))()
+end})
 
-local config = gameConfigs[game.PlaceId]
-if config then
-    if config.label then
-        sTab:CreateLabel(config.label, 7743871480, Color3.fromRGB(70, 31, 120), false)
-    end
-    for _, btn in ipairs(config.buttons) do
-        sTab:CreateButton({
-            Name = btn.name,
-            Callback = function()
-                loadstring(game:HttpGet(btn.url, true))()
-            end,
-        })
+sTab:CreateButton({Name = "Cobalt Better Spy", Callback = function()
+    loadstring(game:HttpGet("https://raw.githubusercontent.com/DEERSTUDIO101/RBX-Scripts/refs/heads/main/Cobalt.txt"))()
+end})
+
+local HttpService = game:GetService("HttpService")
+local JSON_URL = "https://raw.githubusercontent.com/DEERSTUDIO101/RBX-Scripts/refs/heads/main/spg.json"
+
+local success, result = pcall(function()
+    return HttpService:JSONDecode(game:HttpGet(JSON_URL, true))
+end)
+
+if success and result then
+    local placeId = tostring(game.PlaceId)
+    local config = result[placeId]
+
+    if config then
+        if config.label then
+            sTab:CreateLabel(config.label, 7743871480, Color3.fromRGB(70, 31, 120), false)
+        end
+        for _, btn in ipairs(config.buttons) do
+            sTab:CreateButton({
+                Name = btn.name,
+                Callback = function()
+                    loadstring(game:HttpGet(btn.url, true))()
+                end,
+            })
+        end
+    else
+        sTab:CreateLabel("Kein Script für dieses Spiel.", 7743871480, Color3.fromRGB(150, 0, 0), false)
     end
 else
-    print("PlaceId: " .. tostring(game.PlaceId))
+    sTab:CreateLabel("Fehler beim Laden der Config!", 7743871480, Color3.fromRGB(255, 0, 0), false)
 end
