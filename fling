@@ -1,0 +1,309 @@
+local Players           = game:GetService("Players")
+local RunService        = game:GetService("RunService")
+local UserInputService  = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+local lp = Players.LocalPlayer
+
+-- Anti-Detection
+if not ReplicatedStorage:FindFirstChild("juisdfj0i32i0eidsuf0iok") then
+    local d  = Instance.new("Decal")
+    d.Name   = "juisdfj0i32i0eidsuf0iok"
+    d.Parent = ReplicatedStorage
+end
+
+-- ─── State ────────────────────────────────────────────────────────────────
+local hiddenfling = false
+local flingPower  = 10000
+local dragging    = false
+
+-- ─── UI Builder Helper ────────────────────────────────────────────────────
+local function make(class, props, parent)
+    local obj = Instance.new(class)
+    for k, v in pairs(props) do
+        obj[k] = v
+    end
+    obj.Parent = parent
+    return obj
+end
+
+local function corner(radius, parent)
+    make("UICorner", { CornerRadius = UDim.new(0, radius) }, parent)
+end
+
+local function stroke(color, thickness, parent)
+    make("UIStroke", { Color = color, Thickness = thickness }, parent)
+end
+
+-- ─── UI erstellen ─────────────────────────────────────────────────────────
+local ScreenGui = make("ScreenGui", {
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    ResetOnSpawn   = false,
+}, lp:WaitForChild("PlayerGui"))
+
+-- Haupt Frame (kein Draggable = true, damit Slider nicht die UI draggt)
+local Frame = make("Frame", {
+    BackgroundColor3 = Color3.fromRGB(15, 15, 15),
+    Position         = UDim2.new(0.35, 0, 0.35, 0),
+    Size             = UDim2.new(0, 235, 0, 180),
+    Active           = true,
+    Draggable        = false,
+    BorderSizePixel  = 0,
+}, ScreenGui)
+corner(14, Frame)
+stroke(Color3.fromRGB(50, 50, 50), 1, Frame)
+
+-- Gradient oben drauf
+local grad = make("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(22, 22, 22)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 12, 12)),
+    }),
+    Rotation = 90,
+}, Frame)
+
+-- Hide Button (außerhalb des Frames, immer sichtbar)
+local HideBtn = make("TextButton", {
+    Position         = UDim2.new(0.05, 0, 0.9, 0),
+    Size             = UDim2.new(0, 46, 0, 28),
+    BackgroundColor3 = Color3.fromRGB(30, 30, 30),
+    Font             = Enum.Font.GothamBold,
+    Text             = "X",
+    TextColor3       = Color3.fromRGB(255, 255, 255),
+    TextSize         = 16,
+    BorderSizePixel  = 0,
+}, ScreenGui)
+corner(8, HideBtn)
+stroke(Color3.fromRGB(60, 60, 60), 1, HideBtn)
+
+-- Titel
+local Title = make("TextLabel", {
+    BackgroundTransparency = 1,
+    Size       = UDim2.new(1, -40, 0.17, 0),
+    Font       = Enum.Font.GothamBlack,
+    Text       = "💥 Touch Fling",
+    TextColor3 = Color3.fromRGB(255, 255, 255),
+    TextSize   = 20,
+}, Frame)
+
+-- X Button oben rechts im Frame
+local CloseBtn = make("TextButton", {
+    Position         = UDim2.new(1, -28, 0, 4),
+    Size             = UDim2.new(0, 24, 0, 24),
+    BackgroundColor3 = Color3.fromRGB(170, 30, 30),
+    Font             = Enum.Font.GothamBold,
+    Text             = "X",
+    TextColor3       = Color3.fromRGB(255, 255, 255),
+    TextSize         = 14,
+    BorderSizePixel  = 0,
+    ZIndex           = 10,
+}, Frame)
+corner(6, CloseBtn)
+
+-- Drag Handle nur auf Titelbereich
+local DragHandle = make("TextButton", {
+    BackgroundTransparency = 1,
+    Size   = UDim2.new(1, -40, 0.17, 0),
+    Text   = "",
+    ZIndex = 10,
+}, Frame)
+
+local dragStart, startPos
+DragHandle.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragStart = input.Position
+        startPos  = Frame.Position
+    end
+end)
+DragHandle.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1
+    or input.UserInputType == Enum.UserInputType.Touch then
+        dragStart = nil
+    end
+end)
+
+-- Trennlinie
+local Divider = make("Frame", {
+    Position         = UDim2.new(0.05, 0, 0.18, 0),
+    Size             = UDim2.new(0.9, 0, 0, 1),
+    BackgroundColor3 = Color3.fromRGB(50, 50, 50),
+    BorderSizePixel  = 0,
+}, Frame)
+
+-- Toggle Button
+local Toggle = make("TextButton", {
+    Position         = UDim2.new(0.1, 0, 0.22, 0),
+    Size             = UDim2.new(0.8, 0, 0.2, 0),
+    BackgroundColor3 = Color3.fromRGB(170, 30, 30),
+    Font             = Enum.Font.GothamBold,
+    Text             = "OFF",
+    TextColor3       = Color3.fromRGB(255, 255, 255),
+    TextSize         = 22,
+    BorderSizePixel  = 0,
+}, Frame)
+corner(8, Toggle)
+
+-- Power Label
+local PowerLabel = make("TextLabel", {
+    BackgroundTransparency = 1,
+    Position   = UDim2.new(0.1, 0, 0.47, 0),
+    Size       = UDim2.new(0.8, 0, 0.14, 0),
+    Font       = Enum.Font.Gotham,
+    Text       = "Fling Power: 10000",
+    TextColor3 = Color3.fromRGB(180, 180, 180),
+    TextSize   = 15,
+}, Frame)
+
+-- Slider Hintergrund
+local PowerBarBg = make("Frame", {
+    Position         = UDim2.new(0.1, 0, 0.64, 0),
+    Size             = UDim2.new(0.8, 0, 0.08, 0),
+    BackgroundColor3 = Color3.fromRGB(35, 35, 35),
+    BorderSizePixel  = 0,
+}, Frame)
+corner(100, PowerBarBg)
+stroke(Color3.fromRGB(55, 55, 55), 1, PowerBarBg)
+
+-- Slider Fill
+local PowerFill = make("Frame", {
+    Size             = UDim2.new(0.1, 0, 1, 0),
+    BackgroundColor3 = Color3.fromRGB(0, 150, 255),
+    BorderSizePixel  = 0,
+}, PowerBarBg)
+corner(100, PowerFill)
+make("UIGradient", {
+    Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 180, 255)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 100, 200)),
+    }),
+}, PowerFill)
+
+-- Slider Knob
+local Knob = make("Frame", {
+    AnchorPoint      = Vector2.new(0.5, 0.5),
+    Position         = UDim2.new(0.1, 0, 0.5, 0),
+    Size             = UDim2.new(0, 14, 0, 14),
+    BackgroundColor3 = Color3.fromRGB(255, 255, 255),
+    BorderSizePixel  = 0,
+    ZIndex           = 3,
+}, PowerBarBg)
+corner(100, Knob)
+
+-- Min/Max Labels
+make("TextLabel", {
+    BackgroundTransparency = 1,
+    Position       = UDim2.new(0.1, 0, 0.76, 0),
+    Size           = UDim2.new(0.3, 0, 0.1, 0),
+    Font           = Enum.Font.Gotham,
+    Text           = "5K",
+    TextColor3     = Color3.fromRGB(90, 90, 90),
+    TextSize       = 12,
+    TextXAlignment = Enum.TextXAlignment.Left,
+}, Frame)
+
+make("TextLabel", {
+    BackgroundTransparency = 1,
+    Position       = UDim2.new(0.6, 0, 0.76, 0),
+    Size           = UDim2.new(0.3, 0, 0.1, 0),
+    Font           = Enum.Font.Gotham,
+    Text           = "55K",
+    TextColor3     = Color3.fromRGB(90, 90, 90),
+    TextSize       = 12,
+    TextXAlignment = Enum.TextXAlignment.Right,
+}, Frame)
+
+-- ─── Events ─────
+
+-- Toggle
+Toggle.MouseButton1Click:Connect(function()
+    hiddenfling = not hiddenfling
+    if hiddenfling then
+        Toggle.Text             = "ON"
+        Toggle.BackgroundColor3 = Color3.fromRGB(20, 170, 70)
+    else
+        Toggle.Text             = "OFF"
+        Toggle.BackgroundColor3 = Color3.fromRGB(170, 30, 30)
+    end
+end)
+
+-- Hide/Show (X Button außerhalb)
+HideBtn.MouseButton1Click:Connect(function()
+    Frame.Visible = not Frame.Visible
+end)
+
+-- Close Button im Frame (selbe Funktion)
+CloseBtn.MouseButton1Click:Connect(function()
+    Frame.Visible = not Frame.Visible
+end)
+
+-- Slider Drag
+PowerBarBg.InputBegan:Connect(function(input)
+    if  input.UserInputType == Enum.UserInputType.MouseButton1
+    or  input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true
+    end
+end)
+
+PowerBarBg.InputEnded:Connect(function(input)
+    if  input.UserInputType == Enum.UserInputType.MouseButton1
+    or  input.UserInputType == Enum.UserInputType.Touch then
+        dragging = false
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if input.UserInputType ~= Enum.UserInputType.MouseMovement
+    and input.UserInputType ~= Enum.UserInputType.Touch then return end
+
+    -- Frame draggen
+    if dragStart and not dragging then
+        local delta = input.Position - dragStart
+        Frame.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+
+    -- Slider
+    if dragging then
+        local mx   = input.Position.X
+        local barX = PowerBarBg.AbsolutePosition.X
+        local barW = PowerBarBg.AbsoluteSize.X
+        local frac = math.clamp((mx - barX) / barW, 0, 1)
+
+        PowerFill.Size  = UDim2.new(frac, 0, 1, 0)
+        Knob.Position   = UDim2.new(frac, 0, 0.5, 0)
+        flingPower      = math.floor(frac * 50000) + 5000
+        PowerLabel.Text = "Fling Power: " .. flingPower
+    end
+end)
+
+local function fling()
+    local hrp, c, vel, movel = nil, nil, nil, 0.1
+    while true do
+        RunService.Heartbeat:Wait()
+        if hiddenfling then
+            while hiddenfling and not (c and c.Parent and hrp and hrp.Parent) do
+                RunService.Heartbeat:Wait()
+                c   = lp.Character
+                hrp = c and c:FindFirstChild("HumanoidRootPart")
+            end
+            if hiddenfling then
+                vel          = hrp.Velocity
+                hrp.Velocity = vel * flingPower + Vector3.new(0, flingPower, 0)
+                RunService.RenderStepped:Wait()
+                if c and c.Parent and hrp and hrp.Parent then
+                    hrp.Velocity = vel
+                end
+                RunService.Stepped:Wait()
+                if c and c.Parent and hrp and hrp.Parent then
+                    hrp.Velocity = vel + Vector3.new(0, movel, 0)
+                    movel        = movel * -1
+                end
+            end
+        end
+    end
+end
+
+task.spawn(fling)
