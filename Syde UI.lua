@@ -77,7 +77,9 @@ if update then
 		task.wait(0.5)
 		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(87, 101, 242)}):Play()
 		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
-		setclipboard(cord)
+		if setclipboard then
+			setclipboard(cord)
+		end
 	end)
 end
 
@@ -1800,6 +1802,29 @@ local function getSliderTitleLabel(sliderFrame)
 		return nil
 	end
 	return sliderFrame:FindFirstChild("Title") or sliderFrame:FindFirstChild("title")
+end
+
+local function normalizeImageSource(imageValue)
+	if imageValue == nil then
+		return ""
+	end
+
+	local asString = tostring(imageValue)
+	if asString == "" then
+		return ""
+	end
+
+	if string.find(asString, "rbxassetid://", 1, true)
+		or string.find(asString, "http://", 1, true)
+		or string.find(asString, "https://", 1, true) then
+		return asString
+	end
+
+	if string.match(asString, "^%d+$") then
+		return "rbxassetid://" .. asString
+	end
+
+	return asString
 end
 
 local function applyTopFunctionBackgrounds(animated)
@@ -5752,6 +5777,58 @@ function syde:Init(library)
 				return ParagraphSettings
 			end
 
+			function telement:Img(ImgData)
+				local data = {
+					Title = ImgData and (ImgData.Title or "Image") or "Image";
+					Image = ImgData and (ImgData.Image or ImgData.Id) or "";
+					Height = ImgData and (ImgData.Height or 180) or 180;
+				}
+
+				local imageFrame = Instance.new("Frame")
+				imageFrame.Name = data.Title
+				imageFrame.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
+				imageFrame.BackgroundTransparency = getBasicButtonTransparency()
+				imageFrame.Size = UDim2.new(1, -35, 0, data.Height + 36)
+				imageFrame.Parent = Page
+
+				local corner = Instance.new("UICorner")
+				corner.CornerRadius = UDim.new(0, 20)
+				corner.Parent = imageFrame
+
+				local title = Instance.new("TextLabel")
+				title.Name = "title"
+				title.BackgroundTransparency = 1
+				title.Font = Enum.Font.GothamMedium
+				title.TextSize = 14
+				title.TextColor3 = Color3.fromRGB(230, 230, 230)
+				title.TextXAlignment = Enum.TextXAlignment.Left
+				title.Text = data.Title
+				title.Size = UDim2.new(1, -20, 0, 24)
+				title.Position = UDim2.new(0, 10, 0, 6)
+				title.Parent = imageFrame
+
+				local image = Instance.new("ImageLabel")
+				image.Name = "ImageLabel"
+				image.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+				image.BackgroundTransparency = 0.15
+				image.BorderSizePixel = 0
+				image.Image = normalizeImageSource(data.Image)
+				image.ScaleType = Enum.ScaleType.Fit
+				image.Size = UDim2.new(1, -20, 0, data.Height)
+				image.Position = UDim2.new(0, 10, 0, 30)
+				image.Parent = imageFrame
+
+				local imageCorner = Instance.new("UICorner")
+				imageCorner.CornerRadius = UDim.new(0, 14)
+				imageCorner.Parent = image
+
+				return imageFrame
+			end
+
+			function telement:Image(ImageData)
+				return self:Img(ImageData)
+			end
+
 			function telement:TextInput(TextInput)
 				local data = {
 					Title = TextInput.Title or "Text Input",
@@ -6124,17 +6201,6 @@ function syde:Init(library)
 			end,
 			SFlag = 'BLUR',
 		})
-
-		a:Toggle({
-			Title = 'UI Animations',
-			Description = 'Enable or disable most UI transition animations.',
-			Value = uiAnimationsEnabled,
-			CallBack = function(v)
-				uiAnimationsEnabled = v
-			end,
-			SFlag = 'UIANIM',
-		})
-
 
 		a:Slider({
 			Title = 'Modifiers',
@@ -6528,6 +6594,16 @@ function syde:Init(library)
 				end
 			end,
 			SFlag = 'AUTOSET',
+		})
+
+		a:Toggle({
+			Title = 'UI Animations',
+			Description = 'Enable or disable most UI transition animations.',
+			Value = uiAnimationsEnabled,
+			CallBack = function(v)
+				uiAnimationsEnabled = v
+			end,
+			SFlag = 'UIANIM',
 		})
 
 		if autoLoadSettings then
