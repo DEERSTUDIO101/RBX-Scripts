@@ -117,9 +117,8 @@ local syde = {
 	ConfigFolder = 'Syde';
 	ConfigFile = 'Config';
 	Flags = {};
-	Settings then
-	
-	end
+	SettingsFlags = {};
+}
 
 -- @Utilities
 
