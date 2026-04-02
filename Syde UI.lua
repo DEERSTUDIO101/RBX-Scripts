@@ -117,8 +117,9 @@ local syde = {
 	ConfigFolder = 'Syde';
 	ConfigFile = 'Config';
 	Flags = {};
-	SettingsFlags = {};
-}
+	Settings then
+	
+	end
 
 -- @Utilities
 
@@ -6440,6 +6441,10 @@ function syde:Init(library)
 		end
 
 		function syde:GetSettingsAutoload()
+			if type(isfile) ~= "function" or type(readfile) ~= "function" then
+				return false
+			end
+
 			local path = syde:GetSettingsAutoloadPath()
 			if not isfile(path) then
 				return false
@@ -6457,7 +6462,11 @@ function syde:Init(library)
 		end
 
 		function syde:SetSettingsAutoload(enabled)
-			if makefolder and not isfolder(syde.ConfigFolder) then
+			if type(writefile) ~= "function" then
+				return false
+			end
+
+			if type(makefolder) == "function" and type(isfolder) == "function" and not isfolder(syde.ConfigFolder) then
 				makefolder(syde.ConfigFolder)
 			end
 
@@ -6466,10 +6475,19 @@ function syde:Init(library)
 				Enabled = enabled == true
 			})
 			writefile(path, payload)
+			return true
 		end
 
 
 		function syde:SaveSettingsConfig()
+			if type(writefile) ~= "function" then
+				syde:Toast({
+					Content = 'Save not supported in this environment';
+					Duration = 3
+				})
+				return
+			end
+
 			local Data = {}
 
 
@@ -6499,6 +6517,14 @@ function syde:Init(library)
 		end
 
 		function syde:LoadSettingsConfig()
+			if type(isfile) ~= "function" or type(readfile) ~= "function" then
+				syde:Toast({
+					Content = 'Load not supported in this environment';
+					Duration = 3
+				})
+				return
+			end
+
 			local path = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
 
 			if not isfile(path) then
@@ -6588,7 +6614,13 @@ function syde:Init(library)
 			Description = 'Automatically load saved theme settings on startup.',
 			Value = autoLoadSettings,
 			CallBack = function(v)
-				syde:SetSettingsAutoload(v)
+				local saved = syde:SetSettingsAutoload(v)
+				if not saved then
+					syde:Toast({
+						Content = 'Autoload file not supported in this environment';
+						Duration = 3
+					})
+				end
 				if v then
 					syde:LoadSettingsConfig()
 				end
