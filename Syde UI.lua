@@ -1765,9 +1765,76 @@ local userinfodisabled = false
 local intro = false
 local bluron = false
 local glow = false
+local uiAnimationsEnabled = true
 
 local uitoggle = Enum.KeyCode.RightShift
 --
+
+local function tweenOrSet(instance, info, goal)
+	if uiAnimationsEnabled then
+		local tween = tweenservice:Create(instance, info, goal)
+		tween:Play()
+		return tween
+	end
+
+	for property, value in pairs(goal) do
+		instance[property] = value
+	end
+
+	return nil
+end
+
+local function getTopFunctionBaseTransparency()
+	return bluron and 0.93 or 0.8
+end
+
+local function getTopFunctionHoverTransparency()
+	return bluron and 0.87 or 0.68
+end
+
+local function getBasicButtonTransparency()
+	return bluron and 0.45 or 0.18
+end
+
+local function applyTopFunctionBackgrounds(animated)
+	local duration = (animated and uiAnimationsEnabled) and 0.4 or 0
+	local target = getTopFunctionBaseTransparency()
+
+	for _, control in ipairs(top.functions:GetChildren()) do
+		if control:IsA("Frame") then
+			if duration > 0 then
+				tweenservice:Create(control, TweenInfo.new(duration, Enum.EasingStyle.Exponential), {
+					BackgroundTransparency = target
+				}):Play()
+			else
+				control.BackgroundTransparency = target
+			end
+		end
+	end
+end
+
+local function isLikelyBasicButton(frame)
+	return frame:IsA("Frame")
+		and frame:FindFirstChild("interact")
+		and frame:FindFirstChild("title")
+		and frame:FindFirstChild("ImageLabel")
+		and frame:FindFirstChild("UIStroke")
+end
+
+local function applyBasicButtonTransparency()
+	local target = getBasicButtonTransparency()
+	local roots = { pages, window.settings and window.settings.pages }
+
+	for _, root in ipairs(roots) do
+		if root then
+			for _, node in ipairs(root:GetDescendants()) do
+				if isLikelyBasicButton(node) then
+					node.BackgroundTransparency = target
+				end
+			end
+		end
+	end
+end
 
 function applyLayout(isMobile)
 	--	Library.lib.Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)
@@ -2248,7 +2315,9 @@ function openui()
 
 	for i,v in pairs(window.top.functions:GetChildren()) do
 		if v:IsA("Frame") then
-			tweenservice:Create(v, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.8 }):Play()
+			tweenservice:Create(v, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
+				BackgroundTransparency = getTopFunctionBaseTransparency()
+			}):Play()
 			v.Visible = true
 			for i,v2 in pairs(v:GetChildren()) do
 				if v2:IsA("ImageLabel") then
@@ -2262,6 +2331,8 @@ function openui()
 
 		end
 	end
+
+	applyTopFunctionBackgrounds(false)
 
 	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.5 }):Play()
 	tweenservice:Create(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.3}):Play()
@@ -2473,6 +2544,46 @@ function syde:Init(library)
 		QuickActions = library.QuickActions or false;
 	}
 
+	local function applyMinihomeInfoTransparency()
+		if not (mh and Minihome and Minihome:FindFirstChild("info")) then
+			return
+		end
+
+		local info = Minihome.info
+		local targetBg = bluron and 0.75 or nil
+		local targetStroke = bluron and 0.7 or nil
+
+		for _, node in ipairs(info:GetDescendants()) do
+			if node:IsA("GuiObject") then
+				local bgAttr = "__syde_bg_original"
+				local originalBg = node:GetAttribute(bgAttr)
+				if originalBg == nil then
+					node:SetAttribute(bgAttr, node.BackgroundTransparency)
+					originalBg = node.BackgroundTransparency
+				end
+
+				if targetBg then
+					node.BackgroundTransparency = math.max(originalBg, targetBg)
+				else
+					node.BackgroundTransparency = originalBg
+				end
+			elseif node:IsA("UIStroke") then
+				local strokeAttr = "__syde_stroke_original"
+				local originalStroke = node:GetAttribute(strokeAttr)
+				if originalStroke == nil then
+					node:SetAttribute(strokeAttr, node.Transparency)
+					originalStroke = node.Transparency
+				end
+
+				if targetStroke then
+					node.Transparency = math.max(originalStroke, targetStroke)
+				else
+					node.Transparency = originalStroke
+				end
+			end
+		end
+	end
+
 	local function getMinihomeTimeText()
 		if use24HourClock then
 			return os.date("%H:%M")
@@ -2510,6 +2621,8 @@ function syde:Init(library)
 			ui.minihome:TweenSize(UDim2.new(0, 150, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.8, true)
 		end
 	end
+
+	applyMinihomeInfoTransparency()
 
 
 	if not uiclosed then
@@ -2590,12 +2703,13 @@ function syde:Init(library)
 		v.MouseEnter:Connect(function()
 			if not uiclosed then
 				if v.Name ~= "plugins" then
-					TweenService:Create(
-						image,
-						TweenInfo.new(0.5, Enum.EasingStyle.Exponential),
-						{ ImageTransparency = 0.7 }
-					):Play()
+					tweenOrSet(image, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
+						ImageTransparency = 0.7
+					})
 				end
+				tweenOrSet(v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+					BackgroundTransparency = getTopFunctionHoverTransparency()
+				})
 			end
 
 
@@ -2624,12 +2738,13 @@ function syde:Init(library)
 		v.MouseLeave:Connect(function()
 			if not uiclosed then
 				if v.Name ~= "plugins" then
-					TweenService:Create(
-						image,
-						TweenInfo.new(0.5, Enum.EasingStyle.Exponential),
-						{ ImageTransparency = 0 }
-					):Play()
+					tweenOrSet(image, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
+						ImageTransparency = 0
+					})
 				end
+				tweenOrSet(v, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), {
+					BackgroundTransparency = getTopFunctionBaseTransparency()
+				})
 			end
 
 
@@ -3445,6 +3560,7 @@ function syde:Init(library)
 				button.title.Text = data.Title
 				button.Name = data.Title
 				button.title.Size = UDim2.new(0, button.title.TextBounds.X + 15,0, 35)
+				button.BackgroundTransparency = getBasicButtonTransparency()
 
 				local c
 
@@ -5787,6 +5903,16 @@ function syde:Init(library)
 			SFlag = 'TIME24',
 		})
 
+		a:Toggle({
+			Title = 'UI Animations',
+			Description = 'Enable or disable most UI transition animations.',
+			Value = uiAnimationsEnabled,
+			CallBack = function(v)
+				uiAnimationsEnabled = v
+			end,
+			SFlag = 'UIANIM',
+		})
+
 		a:ColorPicker({
 			Title = 'Accent',
 			RD = false,
@@ -5951,6 +6077,9 @@ function syde:Init(library)
 					dof.FarIntensity = 0
 
 					bluron = true
+					applyTopFunctionBackgrounds(false)
+					applyMinihomeInfoTransparency()
+					applyBasicButtonTransparency()
 
 				else
 					window.shadow.ImageLabel.Visible = true
@@ -5965,6 +6094,9 @@ function syde:Init(library)
 					syde:UnbindFrame(window)
 
 					bluron = false
+					applyTopFunctionBackgrounds(false)
+					applyMinihomeInfoTransparency()
+					applyBasicButtonTransparency()
 				end
 			end,
 			SFlag = 'BLUR',
@@ -6441,6 +6573,13 @@ function syde:Init(library)
 
 
 		local function ChangeName(Name)
+			if not uiAnimationsEnabled then
+				pages.clipframe.title.Text = Name
+				pages.clipframe.title.TextTransparency = 0
+				pages.clipframe.title.Position = UDim2.new(0, 5,0.5, 0)
+				return
+			end
+
 			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { TextTransparency = pages.clipframe.title.TextTransparency }):Play()
 			tweenservice:Create(pages.clipframe.title, TweenInfo.new(0), { Position = pages.clipframe.title.Position }):Play()
 
@@ -6805,29 +6944,38 @@ function syde:Init(library)
 				-- Optional: switch tab visuals (if SwitchToTab does this)
 				SwitchToTab(page.Name)
 
-				task.wait(0.05) -- small delay to allow UI to update
+				if uiAnimationsEnabled then
+					task.wait(0.05) -- small delay to allow UI to update
+				end
 
 				-- Calculate scroll position
 				local y = func.AbsolutePosition.Y - openedPage.AbsolutePosition.Y + openedPage.CanvasPosition.Y
 
 				-- Scroll to the function
-				tweenservice:Create(
-					openedPage,
-					TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
-					{ CanvasPosition = Vector2.new(0, math.max(0, y - 20)) }
-				):Play()
+				local targetCanvas = Vector2.new(0, math.max(0, y - 20))
+				if uiAnimationsEnabled then
+					tweenservice:Create(
+						openedPage,
+						TweenInfo.new(0.6, Enum.EasingStyle.Exponential, Enum.EasingDirection.Out),
+						{ CanvasPosition = targetCanvas }
+					):Play()
+				else
+					openedPage.CanvasPosition = targetCanvas
+				end
 
 				-- Highlight flash
-				local original = func.BackgroundColor3
-				tweenservice:Create(func, TweenInfo.new(0.2), {
-					BackgroundColor3 = syde:GetLighter(original, 0.03)
-				}):Play()
-
-				task.delay(0.35, function()
-					tweenservice:Create(func, TweenInfo.new(0.35), {
-						BackgroundColor3 = original
+				if uiAnimationsEnabled then
+					local original = func.BackgroundColor3
+					tweenservice:Create(func, TweenInfo.new(0.2), {
+						BackgroundColor3 = syde:GetLighter(original, 0.03)
 					}):Play()
-				end)
+
+					task.delay(0.35, function()
+						tweenservice:Create(func, TweenInfo.new(0.35), {
+							BackgroundColor3 = original
+						}):Play()
+					end)
+				end
 			end)
 
 			result.MouseEnter:Connect(function()
@@ -6938,6 +7086,7 @@ function syde:Init(library)
 			button.Name = data.Title
 			button.title.Size = UDim2.new(0, button.title.TextBounds.X + 15,0, 35)
 			button:SetAttribute("Searchable", true)
+			button.BackgroundTransparency = getBasicButtonTransparency()
 
 			local c
 
