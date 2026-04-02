@@ -1786,15 +1786,19 @@ local function tweenOrSet(instance, info, goal)
 end
 
 local function getTopFunctionBaseTransparency()
-	return bluron and 0.93 or 0.8
+	return bluron and 0.95 or 0.86
 end
 
 local function getTopFunctionHoverTransparency()
-	return bluron and 0.87 or 0.68
+	return bluron and 0.9 or 0.76
+end
+
+local function getTopFunctionsContainerTransparency()
+	return bluron and 0.97 or 0.9
 end
 
 local function getBasicButtonTransparency()
-	return bluron and 0.45 or 0.18
+	return bluron and 0.62 or 0.34
 end
 
 local function getSliderTitleLabel(sliderFrame)
@@ -1830,6 +1834,17 @@ end
 local function applyTopFunctionBackgrounds(animated)
 	local duration = (animated and uiAnimationsEnabled) and 0.4 or 0
 	local target = getTopFunctionBaseTransparency()
+	local containerTarget = getTopFunctionsContainerTransparency()
+
+	if top and top:FindFirstChild("functions") and top.functions:IsA("GuiObject") then
+		if duration > 0 then
+			tweenservice:Create(top.functions, TweenInfo.new(duration, Enum.EasingStyle.Exponential), {
+				BackgroundTransparency = containerTarget
+			}):Play()
+		else
+			top.functions.BackgroundTransparency = containerTarget
+		end
+	end
 
 	for _, control in ipairs(top.functions:GetChildren()) do
 		if control:IsA("Frame") then
@@ -1840,6 +1855,26 @@ local function applyTopFunctionBackgrounds(animated)
 			else
 				control.BackgroundTransparency = target
 			end
+		end
+	end
+end
+
+local function applySettingsFunctionBackground(animated)
+	local closeButton = window
+		and window:FindFirstChild("settings")
+		and window.settings:FindFirstChild("top")
+		and window.settings.top:FindFirstChild("functions")
+		and window.settings.top.functions:FindFirstChild("close")
+
+	if closeButton and closeButton:IsA("GuiObject") then
+		local duration = (animated and uiAnimationsEnabled) and 0.35 or 0
+		local target = getTopFunctionBaseTransparency()
+		if duration > 0 then
+			tweenservice:Create(closeButton, TweenInfo.new(duration, Enum.EasingStyle.Exponential), {
+				BackgroundTransparency = target
+			}):Play()
+		else
+			closeButton.BackgroundTransparency = target
 		end
 	end
 end
@@ -1866,6 +1901,17 @@ local function applyBasicButtonTransparency()
 		end
 	end
 end
+
+local function applyAnimationMode()
+	local elastic = uiAnimationsEnabled and Enum.ElasticBehavior.WhenScrollable or Enum.ElasticBehavior.Never
+	for _, node in ipairs(window:GetDescendants()) do
+		if node:IsA("ScrollingFrame") then
+			node.ElasticBehavior = elastic
+		end
+	end
+end
+
+applyAnimationMode()
 
 function applyLayout(isMobile)
 	--	Library.lib.Size = isMobile and UDim2.new(0, 543,0, 321) or UDim2.new(0, 715, 0, 575)
@@ -2337,7 +2383,9 @@ function openui()
 	tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
 	tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
 
-	tweenservice:Create(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 }):Play()
+	tweenservice:Create(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
+		BackgroundTransparency = getTopFunctionsContainerTransparency()
+	}):Play()
 
 	if window.wallpaper.ison.Value  then
 		tweenservice:Create(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.84 }):Play()
@@ -2575,33 +2623,69 @@ function syde:Init(library)
 		QuickActions = library.QuickActions or false;
 	}
 
-	local function applyMinihomeInfoTransparency()
-		if not (mh and Minihome and Minihome:FindFirstChild("info")) then
-			return
-		end
+local function applyMinihomeInfoTransparency()
+	if not (mh and Minihome) then
+		return
+	end
 
-		local info = Minihome.info
-		local targetBg = bluron and 0.75 or nil
-		local targetStroke = bluron and 0.7 or nil
+	local targetBg = bluron and 0.78 or nil
+	local targetStroke = bluron and 0.78 or nil
+	local targetImage = bluron and 0.35 or nil
+	local targetText = bluron and 0.12 or nil
 
-		for _, node in ipairs(info:GetDescendants()) do
-			if node:IsA("GuiObject") then
-				local bgAttr = "__syde_bg_original"
-				local originalBg = node:GetAttribute(bgAttr)
-				if originalBg == nil then
-					node:SetAttribute(bgAttr, node.BackgroundTransparency)
+	local nodes = { Minihome }
+	for _, node in ipairs(Minihome:GetDescendants()) do
+		table.insert(nodes, node)
+	end
+
+	for _, node in ipairs(nodes) do
+		if node:IsA("GuiObject") then
+			local bgAttr = "__syde_bg_original"
+			local originalBg = node:GetAttribute(bgAttr)
+			if originalBg == nil then
+				node:SetAttribute(bgAttr, node.BackgroundTransparency)
 					originalBg = node.BackgroundTransparency
 				end
 
-				if targetBg then
-					node.BackgroundTransparency = math.max(originalBg, targetBg)
-				else
-					node.BackgroundTransparency = originalBg
+			if targetBg then
+				node.BackgroundTransparency = math.max(originalBg, targetBg)
+			else
+				node.BackgroundTransparency = originalBg
+			end
+
+			if node:IsA("ImageLabel") or node:IsA("ImageButton") then
+				local imgAttr = "__syde_img_original"
+				local originalImg = node:GetAttribute(imgAttr)
+				if originalImg == nil then
+					node:SetAttribute(imgAttr, node.ImageTransparency)
+					originalImg = node.ImageTransparency
 				end
-			elseif node:IsA("UIStroke") then
-				local strokeAttr = "__syde_stroke_original"
-				local originalStroke = node:GetAttribute(strokeAttr)
-				if originalStroke == nil then
+
+				if targetImage then
+					node.ImageTransparency = math.max(originalImg, targetImage)
+				else
+					node.ImageTransparency = originalImg
+				end
+			end
+
+			if node:IsA("TextLabel") or node:IsA("TextButton") then
+				local textAttr = "__syde_txt_original"
+				local originalText = node:GetAttribute(textAttr)
+				if originalText == nil then
+					node:SetAttribute(textAttr, node.TextTransparency)
+					originalText = node.TextTransparency
+				end
+
+				if targetText then
+					node.TextTransparency = math.max(originalText, targetText)
+				else
+					node.TextTransparency = originalText
+				end
+			end
+		elseif node:IsA("UIStroke") then
+			local strokeAttr = "__syde_stroke_original"
+			local originalStroke = node:GetAttribute(strokeAttr)
+			if originalStroke == nil then
 					node:SetAttribute(strokeAttr, node.Transparency)
 					originalStroke = node.Transparency
 				end
@@ -3435,7 +3519,9 @@ function syde:Init(library)
 
 		tweenservice:Create(window.settings.top.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0}):Play()
 		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
-		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
+		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
+			BackgroundTransparency = getTopFunctionBaseTransparency()
+		}):Play()
 		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0}):Play()
 	end
 
@@ -3605,14 +3691,13 @@ function syde:Init(library)
 					-- UI Stroke effect on button press
 
 					button.interact.MouseButton1Down:Connect(function()
-						tweenservice:Create(button.UIStroke, fOTween, { Transparency = 1 }):Play()
-						tweenservice:Create(button.ImageLabel, fOTween, { ImageTransparency = 1 }):Play()
-						tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+						tweenOrSet(button.UIStroke, fOTween, { Transparency = 1 })
+						tweenOrSet(button.ImageLabel, fOTween, { ImageTransparency = 1 })
 					end)
 
 					button.interact.MouseButton1Up:Connect(function()
-						tweenservice:Create(button.UIStroke, fITween, { Transparency = 0 }):Play()
-						tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+						tweenOrSet(button.UIStroke, fITween, { Transparency = 0 })
+						tweenOrSet(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 })
 
 
 					end)
@@ -3631,8 +3716,8 @@ function syde:Init(library)
 
 					-- Extra Check 
 					button.interact.MouseLeave:Connect(function()
-						tweenservice:Create(button.UIStroke, fITween, { Transparency = 0 }):Play()
-						tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+						tweenOrSet(button.UIStroke, fITween, { Transparency = 0 })
+						tweenOrSet(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 })
 					end)
 				elseif data.Type == 'Hold' then
 					local HoldTime = data.HoldTime
@@ -6174,6 +6259,7 @@ function syde:Init(library)
 
 					bluron = true
 					applyTopFunctionBackgrounds(false)
+					applySettingsFunctionBackground(false)
 					applyMinihomeInfoTransparency()
 					applyBasicButtonTransparency()
 
@@ -6195,6 +6281,7 @@ function syde:Init(library)
 
 					bluron = false
 					applyTopFunctionBackgrounds(false)
+					applySettingsFunctionBackground(false)
 					applyMinihomeInfoTransparency()
 					applyBasicButtonTransparency()
 				end
@@ -6633,6 +6720,9 @@ function syde:Init(library)
 			Value = uiAnimationsEnabled,
 			CallBack = function(v)
 				uiAnimationsEnabled = v
+				applyAnimationMode()
+				applyTopFunctionBackgrounds(false)
+				applySettingsFunctionBackground(false)
 			end,
 			SFlag = 'UIANIM',
 		})
@@ -7321,14 +7411,13 @@ function syde:Init(library)
 				-- UI Stroke effect on button press
 
 				button.interact.MouseButton1Down:Connect(function()
-					tweenservice:Create(button.UIStroke, fOTween, { Transparency = 1 }):Play()
-					tweenservice:Create(button.ImageLabel, fOTween, { ImageTransparency = 1 }):Play()
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+					tweenOrSet(button.UIStroke, fOTween, { Transparency = 1 })
+					tweenOrSet(button.ImageLabel, fOTween, { ImageTransparency = 1 })
 				end)
 
 				button.interact.MouseButton1Up:Connect(function()
-					tweenservice:Create(button.UIStroke, fITween, { Transparency = 0 }):Play()
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+					tweenOrSet(button.UIStroke, fITween, { Transparency = 0 })
+					tweenOrSet(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 })
 
 
 				end)
@@ -7347,8 +7436,8 @@ function syde:Init(library)
 
 				-- Extra Check 
 				button.interact.MouseLeave:Connect(function()
-					tweenservice:Create(button.UIStroke, fITween, { Transparency = 0 }):Play()
-					tweenservice:Create(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 }):Play()
+					tweenOrSet(button.UIStroke, fITween, { Transparency = 0 })
+					tweenOrSet(button.ImageLabel, TweenInfo.new(0.8, Enum.EasingStyle.Exponential), { ImageTransparency = 0.95 })
 				end)
 			elseif data.Type == 'Hold' then
 				local HoldTime = data.HoldTime
@@ -8131,6 +8220,76 @@ function syde:Init(library)
 				end
 			end
 
+		end
+
+		-- Compatibility aliases for older test/demo scripts
+		function initelement:CreateSlider(Slider)
+			return self:Slider(Slider)
+		end
+
+		function initelement:Img(ImgData)
+			local data = {
+				Title = ImgData and (ImgData.Title or "Image") or "Image";
+				Image = ImgData and (ImgData.Image or ImgData.Id) or "";
+				Height = ImgData and (ImgData.Height or 220) or 220;
+			}
+
+			local imageFrame = Instance.new("Frame")
+			imageFrame.Name = data.Title
+			imageFrame.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
+			imageFrame.BackgroundTransparency = getBasicButtonTransparency()
+			imageFrame.Size = UDim2.new(1, -35, 0, data.Height + 36)
+			imageFrame.Parent = Page
+			imageFrame:SetAttribute("Searchable", true)
+
+			local corner = Instance.new("UICorner")
+			corner.CornerRadius = UDim.new(0, 20)
+			corner.Parent = imageFrame
+
+			local title = Instance.new("TextLabel")
+			title.Name = "title"
+			title.BackgroundTransparency = 1
+			title.Font = Enum.Font.GothamMedium
+			title.TextSize = 14
+			title.TextColor3 = Color3.fromRGB(230, 230, 230)
+			title.TextXAlignment = Enum.TextXAlignment.Left
+			title.Text = data.Title
+			title.Size = UDim2.new(1, -20, 0, 24)
+			title.Position = UDim2.new(0, 10, 0, 6)
+			title.Parent = imageFrame
+
+			local image = Instance.new("ImageLabel")
+			image.Name = "ImageLabel"
+			image.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+			image.BackgroundTransparency = 0.15
+			image.BorderSizePixel = 0
+			image.Image = normalizeImageSource(data.Image)
+			image.ScaleType = Enum.ScaleType.Fit
+			image.Size = UDim2.new(1, -20, 0, data.Height)
+			image.Position = UDim2.new(0, 10, 0, 30)
+			image.Parent = imageFrame
+
+			local imageCorner = Instance.new("UICorner")
+			imageCorner.CornerRadius = UDim.new(0, 14)
+			imageCorner.Parent = image
+
+			return imageFrame
+		end
+
+		function initelement:Image(ImageData)
+			return self:Img(ImageData)
+		end
+
+		function initelement:Rate(RateData)
+			local data = {
+				Title = (RateData and RateData.Title) or "Rating";
+				WebHook = (RateData and RateData.WebHook) or "";
+			}
+
+			return self:Paragraph({
+				Title = data.Title,
+				Content = "Rate component is not configured in this build.\nWebhook: " .. tostring(data.WebHook)
+			})
 		end
 
 		--@@KeyBind
