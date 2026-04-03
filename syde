@@ -2888,7 +2888,7 @@ function syde:Init(library)
 	Data.Home.hSubText = Data.Home.hSubText or Data.SubText
 	Data.Home.profileImage = Data.Home.profileImage or Data.profileImage
 	
-	local Minihome = ui.minihome
+	local Minihome = ui:FindFirstChild("minihome")
 
 	local MinihomeData = {
 		QuickActions = library.QuickActions or false;
@@ -2997,7 +2997,7 @@ local function applyMinihomeInfoTransparency()
 	local lastTime = tick()
 	local frames = 0
 
-	if mh then
+	if mh and Minihome then
 		rs = RunService.RenderStepped:Connect(function()
 			-- FPS
 			frames += 1
@@ -3008,27 +3008,38 @@ local function applyMinihomeInfoTransparency()
 				lastTime = now
 				frames = 0
 
-				Minihome.info.fps.Text = fps .. " FPS"
+				if Minihome:FindFirstChild("info") and Minihome.info:FindFirstChild("fps") then
+					Minihome.info.fps.Text = fps .. " FPS"
+				end
 			end
 
 			-- Time → 8:45
-			Minihome.info.time.Text = getMinihomeTimeText()
+			if Minihome:FindFirstChild("info") and Minihome.info:FindFirstChild("time") then
+				Minihome.info.time.Text = getMinihomeTimeText()
+			end
 		end)
 
 
 		if MinihomeData.QuickActions == false then
-			ui.minihome.quick.Visible = false
-			ui.minihome:TweenSize(UDim2.new(0, 150, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.8, true)
+			if Minihome:FindFirstChild("quick") then
+				Minihome.quick.Visible = false
+			end
+			Minihome:TweenSize(UDim2.new(0, 150, 0, 40), Enum.EasingDirection.Out, Enum.EasingStyle.Quart, 0.8, true)
 		end
 	end
 
 	applyMinihomeInfoTransparency()
 
 
-	if not uiclosed then
-		ui.minihome.open.quickfunc.interact.MouseButton1Click:Connect(function()
-			ToggleUI()
-		end)
+	if not uiclosed and Minihome then
+		local open = Minihome:FindFirstChild("open")
+		local quickfunc = open and open:FindFirstChild("quickfunc")
+		local interact = quickfunc and quickfunc:FindFirstChild("interact")
+		if interact and interact:IsA("GuiButton") then
+			interact.MouseButton1Click:Connect(function()
+				ToggleUI()
+			end)
+		end
 	end
 
 	if mh and Minihome then
