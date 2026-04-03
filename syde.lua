@@ -6829,6 +6829,8 @@ local function applyMinihomeInfoTransparency()
 		})
 
 
+		local SETTINGS_CONFIG_SCHEMA = "syde.settings.v2"
+
 		function syde:GetSettingsAutoloadPath()
 			return string.format("%s/SettingsAutoload.json", syde.ConfigFolder)
 		end
@@ -6836,6 +6838,7 @@ local function applyMinihomeInfoTransparency()
 		function syde:NormalizeSettingsConfigName(name)
 			local cleaned = tostring(name or ""):gsub("^%s*(.-)%s*$", "%1")
 			cleaned = cleaned:gsub("[\\/:*?\"<>|]", "_")
+			cleaned = cleaned:gsub("%s+", " ")
 			if cleaned == "" then
 				cleaned = "Default"
 			end
@@ -6846,53 +6849,101 @@ local function applyMinihomeInfoTransparency()
 			return string.format("%s/SettingsConfigs", syde.ConfigFolder)
 		end
 
-		function syde:GetSettingsConfigPath(name)
+		function syde:GetPrimarySettingsConfigPath(name)
 			local cleaned = syde:NormalizeSettingsConfigName(name)
 			return string.format("%s/%s.json", syde:GetSettingsConfigFolderPath(), cleaned), cleaned
+		end
+
+		function syde:GetFallbackSettingsConfigPath(name)
+			local cleaned = syde:NormalizeSettingsConfigName(name)
+			return string.format("%s/%s.json", syde.ConfigFolder, cleaned), cleaned
+		end
+
+		function syde:GetLegacySettingsConfigPath()
+			return string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
 		end
 
 		function syde:EnsureSettingsConfigFolders()
 			if type(makefolder) ~= "function" then
 				return
 			end
-
 			pcall(function()
 				makefolder(syde.ConfigFolder)
 			end)
-			local configFolder = syde:GetSettingsConfigFolderPath()
 			pcall(function()
-				makefolder(configFolder)
+				makefolder(syde:GetSettingsConfigFolderPath())
 			end)
 		end
 
-		function syde:ListSettingsConfigs()
-			local configs = {}
-			local seen = {}
-			local ignoredRootFiles = {
-				["SettingsAutoload"] = true,
-				["SettingsConfig"] = true
+		function syde:ReadTextFile(path)
+			if type(isfile) ~= "function" or type(readfile) ~= "function" then
+				return nil
+			end
+			if not isfile(path) then
+				return nil
+			end
+			local ok, content = pcall(function()
+				return readfile(path)
+			end)
+			if ok then
+				return content
+			end
+			return nil
+		end
+
+		function syde:WriteTextFile(path, content)
+			if type(writefile) ~= "function" then
+				return false
+			end
+			local ok = pcall(function()
+				writefile(path, content)
+			end)
+			return ok == true
+		end
+
+		function syde:GetSettingsConfigCandidates(name)
+			local primaryPath, cleaned = syde:GetPrimarySettingsConfigPath(name)
+			local fallbackPath = syde:GetFallbackSettingsConfigPath(cleaned)
+			local candidates = {
+				primaryPath,
+				fallbackPath
 			}
+			if cleaned == "Default" then
+				table.insert(candidates, syde:GetLegacySettingsConfigPath())
+			end
+			return candidates, cleaned
+		end
+
+		function syde:ListSettingsConfigs()
+			local seen = { Default = true }
 			local configFolder = syde:GetSettingsConfigFolderPath()
+			local ignoredRootNames = {
+				["settingsautoload"] = true,
+				["last_game"] = true,
+				[tostring(syde.ConfigFile or ""):lower()] = true
+			}
+
+			local function addFromPath(path, fromRoot)
+				local normalized = tostring(path):gsub("\\", "/")
+				local fileName = normalized:match("([^/]+)$")
+				local name = fileName and fileName:match("^(.-)%.json$")
+				if name and name ~= "" then
+					local lowered = name:lower()
+					if not fromRoot or not ignoredRootNames[lowered] then
+						seen[name] = true
+					end
+				end
+			end
 
 			if type(listfiles) == "function" and type(isfolder) == "function" and isfolder(configFolder) then
 				local ok, files = pcall(function()
 					return listfiles(configFolder)
 				end)
 				if ok and type(files) == "table" then
-					for _, filePath in ipairs(files) do
-						local normalized = tostring(filePath):gsub("\\", "/")
-						local fileName = normalized:match("([^/]+)$")
-						local configName = fileName and fileName:match("^(.-)%.json$")
-						if configName and configName ~= "" then
-							seen[configName] = true
-						end
+					for _, path in ipairs(files) do
+						addFromPath(path, false)
 					end
 				end
-			end
-
-			local legacyPath = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
-			if type(isfile) == "function" and isfile(legacyPath) then
-				seen["Default"] = true
 			end
 
 			if type(listfiles) == "function" and type(isfolder) == "function" and isfolder(syde.ConfigFolder) then
@@ -6900,62 +6951,45 @@ local function applyMinihomeInfoTransparency()
 					return listfiles(syde.ConfigFolder)
 				end)
 				if ok and type(files) == "table" then
-					for _, filePath in ipairs(files) do
-						local normalized = tostring(filePath):gsub("\\", "/")
-						local fileName = normalized:match("([^/]+)$")
-						local configName = fileName and fileName:match("^(.-)%.json$")
-						if configName and configName ~= "" and not ignoredRootFiles[configName] then
-							seen[configName] = true
-						end
+					for _, path in ipairs(files) do
+						addFromPath(path, true)
 					end
 				end
 			end
 
-			for name in pairs(seen) do
-				table.insert(configs, name)
+			if type(isfile) == "function" and isfile(syde:GetLegacySettingsConfigPath()) then
+				seen.Default = true
 			end
 
-			table.sort(configs, function(a, b)
+			local list = {}
+			for name in pairs(seen) do
+				table.insert(list, name)
+			end
+			table.sort(list, function(a, b)
 				return a:lower() < b:lower()
 			end)
-
-			if #configs == 0 then
-				table.insert(configs, "Default")
-			end
-
-			return configs
+			return list
 		end
 
 		function syde:GetSettingsAutoloadData()
-			local defaultData = {
+			local defaults = {
 				Enabled = false,
 				LastConfig = "Default"
 			}
-
-			if type(isfile) ~= "function" or type(readfile) ~= "function" then
-				return defaultData
+			local content = syde:ReadTextFile(syde:GetSettingsAutoloadPath())
+			if not content then
+				return defaults
 			end
-
-			local path = syde:GetSettingsAutoloadPath()
-			if not isfile(path) then
-				return defaultData
-			end
-
 			local ok, decoded = pcall(function()
-				return https:JSONDecode(readfile(path))
+				return https:JSONDecode(content)
 			end)
-			if not ok then
-				return defaultData
+			if not ok or typeof(decoded) ~= "table" then
+				return defaults
 			end
-
-			if typeof(decoded) == "table" then
-				return {
-					Enabled = decoded.Enabled == true,
-					LastConfig = syde:NormalizeSettingsConfigName(decoded.LastConfig or "Default")
-				}
-			end
-
-			return defaultData
+			return {
+				Enabled = decoded.Enabled == true,
+				LastConfig = syde:NormalizeSettingsConfigName(decoded.LastConfig or "Default")
+			}
 		end
 
 		function syde:GetSettingsAutoload()
@@ -6970,77 +7004,195 @@ local function applyMinihomeInfoTransparency()
 			if type(writefile) ~= "function" then
 				return false
 			end
-
 			syde:EnsureSettingsConfigFolders()
-
-			local path = syde:GetSettingsAutoloadPath()
-			local payload = https:JSONEncode({
+			local payload = {
+				Schema = SETTINGS_CONFIG_SCHEMA,
 				Enabled = enabled == true,
-				LastConfig = syde:NormalizeSettingsConfigName(lastConfig or syde:GetLastUsedSettingsConfig())
-			})
-			writefile(path, payload)
-			return true
+				LastConfig = syde:NormalizeSettingsConfigName(lastConfig or "Default")
+			}
+			return syde:WriteTextFile(syde:GetSettingsAutoloadPath(), https:JSONEncode(payload))
 		end
 
 		function syde:SetLastUsedSettingsConfig(name)
-			local autoloadData = syde:GetSettingsAutoloadData()
-			return syde:SetSettingsAutoload(autoloadData.Enabled, name)
+			local data = syde:GetSettingsAutoloadData()
+			return syde:SetSettingsAutoload(data.Enabled, name)
 		end
 
+		function syde:CaptureSettingsConfigPayload()
+			local values = {}
+			for flag, setting in pairs(syde.SettingsFlags or {}) do
+				if type(flag) == "string" and flag ~= "" then
+					if setting.Type == "ColorPicker" and setting.Color then
+						values[flag] = {
+							Kind = "Color",
+							Value = syde:ColorPack(setting.Color)
+						}
+					elseif setting.StarterValue ~= nil then
+						values[flag] = {
+							Kind = "Slider",
+							Value = setting.StarterValue
+						}
+					elseif setting.V ~= nil then
+						values[flag] = {
+							Kind = "Toggle",
+							Value = setting.V
+						}
+					end
+				end
+			end
+
+			return {
+				Schema = SETTINGS_CONFIG_SCHEMA,
+				Build = syde.Build,
+				SavedAt = os.time(),
+				Values = values
+			}
+		end
+
+		function syde:DecodeSettingsConfigPayload(rawData)
+			if typeof(rawData) ~= "table" then
+				return nil
+			end
+
+			if typeof(rawData.Values) == "table" then
+				return rawData.Values
+			end
+
+			local converted = {}
+			for flag, value in pairs(rawData) do
+				if type(flag) == "string" and flag:sub(1, 1) ~= "_" then
+					if typeof(value) == "table" and value.Kind ~= nil and value.Value ~= nil then
+						converted[flag] = value
+					elseif typeof(value) == "table" and value.R ~= nil and value.G ~= nil and value.B ~= nil then
+						converted[flag] = { Kind = "Color", Value = value }
+					elseif type(value) == "number" then
+						converted[flag] = { Kind = "Slider", Value = value }
+					else
+						converted[flag] = { Kind = "Toggle", Value = value }
+					end
+				end
+			end
+			return converted
+		end
+
+		function syde:ApplySettingsConfigValue(flag, packedValue)
+			local setting = syde.SettingsFlags and syde.SettingsFlags[flag]
+			if not setting then
+				return false
+			end
+
+			local value = packedValue
+			local kind = nil
+			if typeof(packedValue) == "table" and packedValue.Kind ~= nil and packedValue.Value ~= nil then
+				kind = packedValue.Kind
+				value = packedValue.Value
+			end
+
+			if setting.Type == "ColorPicker" or kind == "Color" then
+				local colorValue = value
+				if typeof(colorValue) == "table" then
+					colorValue = syde:ColorUnpack(colorValue)
+				end
+				if typeof(colorValue) ~= "Color3" then
+					return false
+				end
+				if setting.Set then
+					local ok = pcall(function()
+						setting:Set(colorValue, true)
+					end)
+					return ok
+				end
+				setting.Color = colorValue
+				if setting.CallBack then
+					pcall(function()
+						setting.CallBack(colorValue)
+					end)
+				end
+				return true
+			end
+
+			if setting.StarterValue ~= nil or kind == "Slider" then
+				local numeric = tonumber(value)
+				if not numeric then
+					return false
+				end
+				if setting.Set then
+					local ok = pcall(function()
+						setting:Set(numeric, true)
+					end)
+					return ok
+				end
+				setting.StarterValue = numeric
+				if setting.CallBack then
+					pcall(function()
+						setting.CallBack(numeric)
+					end)
+				end
+				return true
+			end
+
+			if setting.V ~= nil or kind == "Toggle" then
+				local boolValue = (value == true or value == 1 or tostring(value):lower() == "true")
+				if setting.Set then
+					local ok = pcall(function()
+						setting:Set(boolValue, true)
+					end)
+					return ok
+				end
+				setting.V = boolValue
+				if setting.CallBack then
+					pcall(function()
+						setting.CallBack(boolValue)
+					end)
+				end
+				return true
+			end
+
+			if setting.Set then
+				local ok = pcall(function()
+					setting:Set(value, true)
+				end)
+				return ok
+			end
+
+			return false
+		end
 
 		function syde:SaveSettingsConfig(configName)
 			if type(writefile) ~= "function" then
 				syde:Toast({
-					Content = 'Save not supported in this environment';
+					Content = "Save not supported in this environment";
 					Duration = 3
 				})
 				return false
 			end
 
 			syde:EnsureSettingsConfigFolders()
-			local path, cleanedName = syde:GetSettingsConfigPath(configName)
-			local Data = {}
+			local primaryPath, cleanedName = syde:GetPrimarySettingsConfigPath(configName)
+			local fallbackPath = syde:GetFallbackSettingsConfigPath(cleanedName)
+			local payload = syde:CaptureSettingsConfigPayload()
+			local encoded = https:JSONEncode(payload)
 
-
-			for flag, v in pairs(syde.SettingsFlags or {}) do
-
-				if v.Type == "ColorPicker" and v.Color then
-					Data[flag] = syde:ColorPack(v.Color)
-				elseif v.V ~= nil then
-					Data[flag] = v.V
-				elseif v.StarterValue ~= nil then
-					Data[flag] = v.StarterValue
-				else
-					warn("[DEBUG] Skipping flag", flag, "no valid value found")
-				end
+			local savedPath = nil
+			if syde:WriteTextFile(primaryPath, encoded) then
+				savedPath = primaryPath
+			elseif syde:WriteTextFile(fallbackPath, encoded) then
+				savedPath = fallbackPath
 			end
 
-
-			local encoded = https:JSONEncode(Data)
-			local saved = pcall(function()
-				writefile(path, encoded)
-			end)
-			if not saved then
-				local fallbackPath = string.format("%s/%s.json", syde.ConfigFolder, cleanedName)
-				saved = pcall(function()
-					writefile(fallbackPath, encoded)
-				end)
-			end
-			if not saved then
+			if not savedPath then
 				syde:Toast({
 					Content = "Failed to save config: " .. cleanedName;
 					Duration = 4
 				})
 				return false
 			end
-			if cleanedName == "Default" then
-				local legacyPath = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
-				pcall(function()
-					writefile(legacyPath, encoded)
-				end)
-			end
-			syde:SetLastUsedSettingsConfig(cleanedName)
 
+			if cleanedName == "Default" then
+				syde:WriteTextFile(syde:GetLegacySettingsConfigPath(), encoded)
+			end
+
+			syde:SetLastUsedSettingsConfig(cleanedName)
 			syde:Toast({
 				Content = "Saved config: " .. cleanedName;
 				Duration = 3
@@ -7049,22 +7201,19 @@ local function applyMinihomeInfoTransparency()
 		end
 
 		function syde:LoadSettingsConfig(configName)
-			if type(isfile) ~= "function" or type(readfile) ~= "function" then
-				syde:Toast({
-					Content = 'Load not supported in this environment';
-					Duration = 3
-				})
-				return false
+			local candidates, cleanedName = syde:GetSettingsConfigCandidates(configName)
+			local content = nil
+			local usedPath = nil
+
+			for _, path in ipairs(candidates) do
+				content = syde:ReadTextFile(path)
+				if content then
+					usedPath = path
+					break
+				end
 			end
 
-			local path, cleanedName = syde:GetSettingsConfigPath(configName)
-			local legacyPath = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
-			if not isfile(path) and cleanedName == "Default" and isfile(legacyPath) then
-				path = legacyPath
-			end
-
-			if not isfile(path) then
-
+			if not content then
 				syde:Toast({
 					Content = "No config found: " .. cleanedName;
 					Duration = 3
@@ -7072,90 +7221,63 @@ local function applyMinihomeInfoTransparency()
 				return false
 			end
 
-			local success, data = pcall(function()
-				return https:JSONDecode(readfile(path))
+			local ok, decoded = pcall(function()
+				return https:JSONDecode(content)
 			end)
-
-			if not success or typeof(data) ~= "table" then
-				warn("[DEBUG] Failed to decode settings:", data)
-				return
+			if not ok or typeof(decoded) ~= "table" then
+				syde:Toast({
+					Content = "Config is invalid: " .. cleanedName;
+					Duration = 4
+				})
+				return false
 			end
 
-			for flag, val in pairs(data) do
-				local setting = syde.SettingsFlags and syde.SettingsFlags[flag]
-				if setting then
-					if setting.Set then
-						local ok, err = pcall(function()
-							setting:Set(val, true)
-						end)
-						if not ok then
-							warn("[DEBUG] Failed applying setting via Set for:", flag, err)
-						end
-					elseif setting.Type == "ColorPicker" and setting.Color then
-						local unpacked = syde:ColorUnpack(val)
-						if setting.Set then
-							local ok, err = pcall(function()
-								setting:Set(unpacked, true)
-							end)
-							if not ok then
-								warn("[DEBUG] Failed applying color setting for:", flag, err)
-							end
-						else
-							setting.Color = unpacked
-						end
-					elseif setting.V ~= nil then
-						setting.V = val
-						if setting.CallBack then
-							pcall(function()
-								setting.CallBack(val)
-							end)
-						end
-					elseif setting.StarterValue ~= nil then
-						setting.StarterValue = val
-						if setting.CallBack then
-							pcall(function()
-								setting.CallBack(val)
-							end)
-						end
-					end
-				else
-					warn("[DEBUG] No matching setting flag found for:", flag)
+			local values = syde:DecodeSettingsConfigPayload(decoded)
+			if typeof(values) ~= "table" then
+				syde:Toast({
+					Content = "Config has no values: " .. cleanedName;
+					Duration = 4
+				})
+				return false
+			end
+
+			local appliedCount = 0
+			for flag, packed in pairs(values) do
+				local applied = syde:ApplySettingsConfigValue(flag, packed)
+				if applied then
+					appliedCount += 1
 				end
 			end
 
-			syde:SetLastUsedSettingsConfig(cleanedName)
+			if appliedCount == 0 then
+				syde:Toast({
+					Content = "Config loaded but no matching settings: " .. cleanedName;
+					Duration = 4
+				})
+				return false
+			end
 
+			syde:SetLastUsedSettingsConfig(cleanedName)
 			syde:Toast({
-				Content = "Loaded config: " .. cleanedName;
+				Content = string.format("Loaded config: %s (%d)", cleanedName, appliedCount);
 				Duration = 3
 			})
-			return true, cleanedName
+			return true, cleanedName, usedPath
 		end
 
 		local autoLoadData = syde:GetSettingsAutoloadData()
 		local selectedSettingsConfigName = syde:NormalizeSettingsConfigName(autoLoadData.LastConfig)
-
-		a:TextInput({
-			Title = 'Config Name',
-			PlaceHolder = 'Name your config (e.g. Alps)';
-			ClearOnLost = false,
-			OnChanged = function(v)
-				local raw = tostring(v or ""):gsub("^%s*(.-)%s*$", "%1")
-				if raw ~= "" then
-					selectedSettingsConfigName = syde:NormalizeSettingsConfigName(raw)
-				end
-			end,
-			CallBack = function(v)
-				local raw = tostring(v or ""):gsub("^%s*(.-)%s*$", "%1")
-				if raw ~= "" then
-					selectedSettingsConfigName = syde:NormalizeSettingsConfigName(raw)
-				end
-			end
-		})
-
 		local configDropdownTitle = "Saved Configs"
+
 		local function getActiveSettingsConfigName()
 			return syde:NormalizeSettingsConfigName(selectedSettingsConfigName)
+		end
+
+		local function setActiveSettingsConfigName(rawValue)
+			local text = tostring(rawValue or ""):gsub("^%s*(.-)%s*$", "%1")
+			if text ~= "" then
+				selectedSettingsConfigName = syde:NormalizeSettingsConfigName(text)
+			end
 		end
 
 		local function rebuildSettingsConfigDropdown()
@@ -7179,7 +7301,7 @@ local function applyMinihomeInfoTransparency()
 				Title = configDropdownTitle,
 				Options = configs,
 				StarterOption = starter,
-				PlaceHolder = 'Select saved config...';
+				PlaceHolder = "Select saved config...",
 				Multi = false,
 				CallBack = function(choice)
 					if typeof(choice) == "string" and choice ~= "" then
@@ -7189,10 +7311,22 @@ local function applyMinihomeInfoTransparency()
 			})
 		end
 
+		a:TextInput({
+			Title = "Config Name",
+			PlaceHolder = "Name your config (e.g. Alps)",
+			ClearOnLost = false,
+			OnChanged = function(v)
+				setActiveSettingsConfigName(v)
+			end,
+			CallBack = function(v)
+				setActiveSettingsConfigName(v)
+			end
+		})
+
 		a:Button({
-			Title = 'Save',
-			Description = 'Save all setting configurations.',
-			CallBack = function ()
+			Title = "Save",
+			Description = "Save all setting configurations.",
+			CallBack = function()
 				local ok, usedName = syde:SaveSettingsConfig(getActiveSettingsConfigName())
 				if ok and usedName then
 					selectedSettingsConfigName = usedName
@@ -7200,10 +7334,11 @@ local function applyMinihomeInfoTransparency()
 				end
 			end
 		})
+
 		a:Button({
-			Title = 'Load',
-			Description = 'Load all setting configurations.',
-			CallBack = function ()
+			Title = "Load",
+			Description = "Load all setting configurations.",
+			CallBack = function()
 				local ok, usedName = syde:LoadSettingsConfig(getActiveSettingsConfigName())
 				if ok and usedName then
 					selectedSettingsConfigName = usedName
@@ -7211,26 +7346,35 @@ local function applyMinihomeInfoTransparency()
 			end
 		})
 
+		a:Button({
+			Title = "Refresh Config List",
+			Description = "Rebuild the config dropdown list.",
+			CallBack = function()
+				rebuildSettingsConfigDropdown()
+			end
+		})
+
 		rebuildSettingsConfigDropdown()
 
 		local autoLoadSettings = autoLoadData.Enabled
 		a:Toggle({
-			Title = 'Autoload Settings',
-			Description = 'Automatically load the last used named config on startup.',
+			Title = "Autoload Settings",
+			Description = "Automatically load the last used named config on startup.",
 			Value = autoLoadSettings,
 			CallBack = function(v)
 				local saved = syde:SetSettingsAutoload(v, getActiveSettingsConfigName())
 				if not saved then
 					syde:Toast({
-						Content = 'Autoload file not supported in this environment';
+						Content = "Autoload file not supported in this environment";
 						Duration = 3
 					})
+					return
 				end
 				if v then
 					syde:LoadSettingsConfig(getActiveSettingsConfigName())
 				end
 			end,
-			SFlag = 'AUTOSET',
+			SFlag = "AUTOSET",
 		})
 
 		a:Toggle({
