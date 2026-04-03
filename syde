@@ -1,3 +1,56 @@
+local getgenv = rawget(_G, 'getgenv')
+local loadstring = rawget(_G, 'loadstring')
+local load = rawget(_G, 'load')
+local readfile = rawget(_G, 'readfile')
+local writefile = rawget(_G, 'writefile')
+local isfile = rawget(_G, 'isfile')
+local isfolder = rawget(_G, 'isfolder')
+local makefolder = rawget(_G, 'makefolder')
+local listfiles = rawget(_G, 'listfiles')
+local setclipboard = rawget(_G, 'setclipboard')
+local syn = rawget(_G, 'syn')
+local request = rawget(_G, 'request')
+local http_request = rawget(_G, 'http_request')
+local http = rawget(_G, 'http')
+local getsynasset = rawget(_G, 'getsynasset')
+local getcustomasset = rawget(_G, 'getcustomasset')
+local KRNL_LOADED = rawget(_G, 'KRNL_LOADED')
+local __sydeOverrideResult = nil
+
+local __sydeEnv = _G
+if type(getgenv) == 'function' then
+	local okEnv, env = pcall(getgenv)
+	if okEnv and type(env) == 'table' then
+		__sydeEnv = env
+	end
+end
+
+if not __sydeEnv.__SYDE_LOCAL_SOURCE_REDIRECTING then
+	local compiler = nil
+	if type(loadstring) == 'function' then
+		compiler = loadstring
+	elseif type(load) == 'function' then
+		compiler = load
+	end
+
+	if type(readfile) == 'function' and type(compiler) == 'function' then
+		local okSource, source = pcall(readfile, 'Syde-src.lua')
+		if okSource and type(source) == 'string' and source ~= '' then
+			__sydeEnv.__SYDE_LOCAL_SOURCE_REDIRECTING = true
+			local okChunk, chunk = pcall(compiler, source)
+			if okChunk and type(chunk) == 'function' then
+				local okExec, result = pcall(chunk)
+				__sydeEnv.__SYDE_LOCAL_SOURCE_REDIRECTING = nil
+				if okExec and type(result) == 'table' and type(result.Load) == 'function' then
+					__sydeOverrideResult = result
+				end
+			else
+				__sydeEnv.__SYDE_LOCAL_SOURCE_REDIRECTING = nil
+			end
+		end
+	end
+end
+
 local inputservice =	game:GetService("InsertService")
 local tweenservice = 	game:GetService("TweenService")
 local https = 			game:GetService("HttpService")
@@ -16,29 +69,29 @@ if update then
 	local updategui = game:GetObjects("rbxassetid://122225389943465")[1]
 	updategui.Parent = coregui
 
-	local cord = '/GzumVvz3QM'
+	local cord = "/GzumVvz3QM"
 
 	task.wait(0.5)
 	updategui.Enabled = true
 
 	updategui.main.BackgroundTransparency = 1
-	updategui.main.Size = UDim2.new(0, 150,0, 150)
+	updategui.main.Size = UDim2.new(0, 150, 0, 150)
 	updategui.main.time.TextTransparency = 1
 	updategui.main.info.TextTransparency = 1
 	updategui.main.text.TextLabel.TextTransparency = 1
 	updategui.main.text.more.TextTransparency = 1
 
-	tweenservice:Create(updategui.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-	tweenservice:Create(updategui.main, TweenInfo.new(0.75, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 350,0, 230)}):Play()
+	tweenservice:Create(updategui.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Transparency = 0 }):Play()
+	tweenservice:Create(updategui.main, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 350, 0, 230) }):Play()
 
 	task.wait(0.07)
 
-	tweenservice:Create(updategui.main.time, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-	tweenservice:Create(updategui.main.info, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+	tweenservice:Create(updategui.main.time, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	tweenservice:Create(updategui.main.info, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 	task.wait(0.07)
-	tweenservice:Create(updategui.main.text.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+	tweenservice:Create(updategui.main.text.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 	task.wait(0.07)
-	tweenservice:Create(updategui.main.text.more, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+	tweenservice:Create(updategui.main.text.more, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
 
 	local duration = 25
 	local startTime = tick()
@@ -53,18 +106,17 @@ if update then
 		if remaining <= 0 then
 			connection:Disconnect()
 
-			tweenservice:Create(updategui.main.text.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tweenservice:Create(updategui.main.text.TextLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			task.wait(0.07)
-			tweenservice:Create(updategui.main.text.more, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tweenservice:Create(updategui.main.text.more, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 			task.wait(0.2)
-			tweenservice:Create(updategui.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-			tweenservice:Create(updategui.main, TweenInfo.new(0.75, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 150,0, 130)}):Play()
+			tweenservice:Create(updategui.main, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Transparency = 1 }):Play()
+			tweenservice:Create(updategui.main, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 150, 0, 130) }):Play()
 			updategui.main.s2.Visible = false
 
 			task.wait(0.07)
-
-			tweenservice:Create(updategui.main.time, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(updategui.main.info, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			tweenservice:Create(updategui.main.time, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
+			tweenservice:Create(updategui.main.info, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
 
 			task.wait(0.75)
 			updategui:Destroy()
@@ -72,11 +124,11 @@ if update then
 	end)
 
 	updategui.main.s2.interact.MouseButton1Click:Connect(function()
-		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(74, 255, 33)}):Play()
-		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0}):Play()
+		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { Color = Color3.fromRGB(74, 255, 33) }):Play()
+		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { Transparency = 0 }):Play()
 		task.wait(0.5)
-		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(87, 101, 242)}):Play()
-		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
+		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { Color = Color3.fromRGB(87, 101, 242) }):Play()
+		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { Transparency = 0.5 }):Play()
 		if setclipboard then
 			pcall(function()
 				setclipboard("https://discord.gg" .. cord)
@@ -2343,7 +2395,7 @@ function syde:Modal(Modal)
 		local ModalData = {
 			Title = Modal.Title;
 			Content = Modal.Content;
-			ConfirmCallBack = Modal.ConfimCallBack
+			ConfirmCallBack = Modal.ConfirmCallBack or Modal.ConfimCallBack
 		}
 
 		local ModalInstance = ui.main.modal:Clone()
@@ -2357,13 +2409,29 @@ function syde:Modal(Modal)
 		ModalInstance.Title.TextTransparency = 1
 		ModalInstance.Content.TextTransparency = 1
 
-		ModalInstance.Buttons.Confirm.BackgroundTransparency = 1
-		ModalInstance.Buttons.Confirm.TextLabel.TextTransparency = 1
-		--	ModalInstance.Buttons.Confirm.UIStroke.Transparency = 1
+		local ButtonsFrame = ModalInstance:FindFirstChild("Buttons")
+		local ConfirmButton = ButtonsFrame and ButtonsFrame:FindFirstChild("Confirm")
+		local CancelButton = ButtonsFrame and ButtonsFrame:FindFirstChild("Cancel")
+		local ConfirmLabel = ConfirmButton and ConfirmButton:FindFirstChild("TextLabel")
+		local CancelLabel = CancelButton and CancelButton:FindFirstChild("TextLabel")
+		local CancelStroke = CancelButton and CancelButton:FindFirstChild("UIStroke")
 
-		ModalInstance.Buttons.Cancel.BackgroundTransparency = 1
-		ModalInstance.Buttons.Cancel.TextLabel.TextTransparency = 1
-		ModalInstance.Buttons.Cancel.UIStroke.Transparency = 1
+		if ConfirmButton then
+			ConfirmButton.BackgroundTransparency = 1
+		end
+		if ConfirmLabel then
+			ConfirmLabel.TextTransparency = 1
+		end
+
+		if CancelButton then
+			CancelButton.BackgroundTransparency = 1
+		end
+		if CancelLabel then
+			CancelLabel.TextTransparency = 1
+		end
+		if CancelStroke then
+			CancelStroke.Transparency = 1
+		end
 
 		local function openModal()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
@@ -2376,40 +2444,73 @@ function syde:Modal(Modal)
 			tweenservice:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
 
-			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			if ConfirmButton then
+				tweenservice:Create(ConfirmButton, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
+			end
+			if ConfirmLabel then
+				tweenservice:Create(ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			end
 
-			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			if CancelButton then
+				tweenservice:Create(CancelButton, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			end
+			if CancelLabel then
+				tweenservice:Create(CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+			end
+			if CancelStroke then
+				tweenservice:Create(CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+			end
 
 		end
 		openModal()
 
 		local function closeModal()
-			activeModals -= 1
-			print(activeModals)
-			ModalInstance.Buttons.Cancel.Interactable = false
-			ModalInstance.Buttons.Confirm.Interactable = false
+			activeModals = math.max(activeModals - 1, 0)
+			if CancelButton then
+				pcall(function()
+					CancelButton.Interactable = false
+				end)
+			end
+			if ConfirmButton then
+				pcall(function()
+					ConfirmButton.Interactable = false
+				end)
+			end
 			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
 			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
 			tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
 
-			tweenservice:Create(ModalInstance.Buttons.Confirm, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Confirm.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			--	tweenservice:Create(ModalInstance.Buttons.Confirm.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			if ConfirmButton then
+				tweenservice:Create(ConfirmButton, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			end
+			if ConfirmLabel then
+				tweenservice:Create(ConfirmLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			end
 
-			tweenservice:Create(ModalInstance.Buttons.Cancel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.TextLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Buttons.Cancel.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			if CancelButton then
+				tweenservice:Create(CancelButton, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+			end
+			if CancelLabel then
+				tweenservice:Create(CancelLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+			end
+			if CancelStroke then
+				tweenservice:Create(CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+			end
 			task.wait(0.45)
 			ModalInstance:Destroy()
 		end
 
-
+		local function hideDimIfNoModals()
+			if activeModals == 0 then
+				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+					BackgroundTransparency = 1
+				}):Play()
+				task.wait(0.7)
+				ui.main.dim.Visible = false
+			end
+		end
 
 		if activeModals == 1 then
 			ui.main.dim.Visible = true
@@ -2418,30 +2519,23 @@ function syde:Modal(Modal)
 			}):Play()
 		end
 
-		ModalInstance.Buttons.Confirm.MouseButton1Click:Connect(function()
-			if typeof(ModalData.ConfirmCallBack) == "function" then
-				ModalData.ConfirmCallBack()
-			end
+		if ConfirmButton and ConfirmButton:IsA("GuiButton") then
+			ConfirmButton.MouseButton1Click:Connect(function()
+				if typeof(ModalData.ConfirmCallBack) == "function" then
+					ModalData.ConfirmCallBack()
+				end
 
-			closeModal()
+				closeModal()
+				hideDimIfNoModals()
+			end)
+		end
 
-			if activeModals == 0 then
-				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
-					BackgroundTransparency = 1
-				}):Play()
-				task.wait(0.7)
-				ui.main.dim.Visible = false
-			end
-		end)
-
-		ModalInstance.Buttons.Cancel.MouseButton1Click:Connect(function()
-			closeModal()
-			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
-				BackgroundTransparency = 1
-			}):Play()
-			task.wait(0.7)
-			ui.main.dim.Visible = false
-		end)
+		if CancelButton and CancelButton:IsA("GuiButton") then
+			CancelButton.MouseButton1Click:Connect(function()
+				closeModal()
+				hideDimIfNoModals()
+			end)
+		end
 
 	end)
 end
@@ -2627,6 +2721,8 @@ function closesearch()
 end
 
 --@ ToggleUI
+
+local opensettings, closesettings
 
 function openui()
 	pages.Visible = true
@@ -6218,6 +6314,7 @@ local function applyMinihomeInfoTransparency()
 
 			function telement:TextInput(TextInput)
 				local data = {
+					Type = "TextInput",
 					Title = TextInput.Title or "Text Input",
 					PlaceHolder = TextInput.PlaceHolder or "Enter text...",
 					NumbersOnly = TextInput.NumberOnly or false,
@@ -6225,6 +6322,8 @@ local function applyMinihomeInfoTransparency()
 					--	MaxSize = TextInput.MaxSize or 100,
 					CallBack = TextInput.CallBack,
 					OnChanged = TextInput.OnChanged,
+					SFlag = TextInput.SFlag,
+					Text = tostring(TextInput.Value or ""),
 				}
 
 				local textinput =  window.settings.pages.page.Input:Clone()
@@ -6235,6 +6334,7 @@ local function applyMinihomeInfoTransparency()
 				textinput.TextFrame.TextBox.PlaceholderText = data.PlaceHolder
 
 				local textBox = textinput.TextFrame.TextBox
+				textBox.Text = data.Text
 				local defaultHeight = 32
 				--	local maxHeight = data.MaxSize
 				local ignoreNextClear = false
@@ -6311,6 +6411,7 @@ local function applyMinihomeInfoTransparency()
 				end)
 
 				local function ProcessInput(text)
+					data.Text = tostring(text or "")
 					if typeof(data.CallBack) ~= "function" then
 						return
 					end
@@ -6349,6 +6450,20 @@ local function applyMinihomeInfoTransparency()
 						textBox.ClearTextOnFocus = false
 					end
 				end)
+
+				function data:Set(newValue, skipCallback)
+					local incoming = tostring(newValue or "")
+					data.Text = incoming
+					textBox.Text = incoming
+					textBox.ClearTextOnFocus = false
+					if not skipCallback then
+						ProcessInput(incoming)
+					end
+				end
+
+				if data.SFlag then
+					syde.SettingsFlags[data.SFlag] = data
+				end
 
 
 			end
@@ -7038,6 +7153,11 @@ local function applyMinihomeInfoTransparency()
 							Kind = "Color",
 							Value = syde:ColorPack(setting.Color)
 						}
+					elseif setting.Type == "TextInput" then
+						values[flag] = {
+							Kind = "Text",
+							Value = tostring(setting.Text or "")
+						}
 					elseif setting.StarterValue ~= nil then
 						values[flag] = {
 							Kind = "Slider",
@@ -7078,6 +7198,8 @@ local function applyMinihomeInfoTransparency()
 						converted[flag] = { Kind = "Color", Value = value }
 					elseif type(value) == "number" then
 						converted[flag] = { Kind = "Slider", Value = value }
+					elseif type(value) == "string" then
+						converted[flag] = { Kind = "Text", Value = value }
 					else
 						converted[flag] = { Kind = "Toggle", Value = value }
 					end
@@ -7137,6 +7259,23 @@ local function applyMinihomeInfoTransparency()
 				if setting.CallBack then
 					pcall(function()
 						setting.CallBack(numeric)
+					end)
+				end
+				return true
+			end
+
+			if setting.Type == "TextInput" or kind == "Text" then
+				local textValue = tostring(value or "")
+				if setting.Set then
+					local ok = pcall(function()
+						setting:Set(textValue, false)
+					end)
+					return ok
+				end
+				setting.Text = textValue
+				if setting.CallBack then
+					pcall(function()
+						setting.CallBack(textValue)
 					end)
 				end
 				return true
@@ -7211,7 +7350,9 @@ local function applyMinihomeInfoTransparency()
 			return true, cleanedName
 		end
 
-		function syde:LoadSettingsConfig(configName)
+		function syde:LoadSettingsConfig(configName, options)
+			options = (type(options) == "table" and options) or {}
+			local silent = options.Silent == true
 			local candidates, cleanedName = syde:GetSettingsConfigCandidates(configName)
 			local content = nil
 			local usedPath = nil
@@ -7225,10 +7366,12 @@ local function applyMinihomeInfoTransparency()
 			end
 
 			if not content then
-				syde:Toast({
-					Content = "No config found: " .. cleanedName;
-					Duration = 3
-				})
+				if not silent then
+					syde:Toast({
+						Content = "No config found: " .. cleanedName;
+						Duration = 3
+					})
+				end
 				return false
 			end
 
@@ -7236,19 +7379,23 @@ local function applyMinihomeInfoTransparency()
 				return https:JSONDecode(content)
 			end)
 			if not ok or typeof(decoded) ~= "table" then
-				syde:Toast({
-					Content = "Config is invalid: " .. cleanedName;
-					Duration = 4
-				})
+				if not silent then
+					syde:Toast({
+						Content = "Config is invalid: " .. cleanedName;
+						Duration = 4
+					})
+				end
 				return false
 			end
 
 			local values = syde:DecodeSettingsConfigPayload(decoded)
 			if typeof(values) ~= "table" then
-				syde:Toast({
-					Content = "Config has no values: " .. cleanedName;
-					Duration = 4
-				})
+				if not silent then
+					syde:Toast({
+						Content = "Config has no values: " .. cleanedName;
+						Duration = 4
+					})
+				end
 				return false
 			end
 
@@ -7261,19 +7408,46 @@ local function applyMinihomeInfoTransparency()
 			end
 
 			if appliedCount == 0 then
-				syde:Toast({
-					Content = "Config loaded but no matching settings: " .. cleanedName;
-					Duration = 4
-				})
+				if not silent then
+					syde:Toast({
+						Content = "Config loaded but no matching settings: " .. cleanedName;
+						Duration = 4
+					})
+				end
 				return false
 			end
 
 			syde:SetLastUsedSettingsConfig(cleanedName)
-			syde:Toast({
-				Content = string.format("Loaded config: %s (%d)", cleanedName, appliedCount);
-				Duration = 3
-			})
+			if not silent then
+				syde:Toast({
+					Content = string.format("Loaded config: %s (%d)", cleanedName, appliedCount);
+					Duration = 3
+				})
+			end
 			return true, cleanedName, usedPath
+		end
+
+		function syde:AutoLoadSettingsConfig(configName)
+			local desired = syde:NormalizeSettingsConfigName(configName or syde:GetLastUsedSettingsConfig())
+			task.spawn(function()
+				local attempts = 12
+				for _ = 1, attempts do
+					if next(syde.SettingsFlags or {}) then
+						local ok = syde:LoadSettingsConfig(desired, { Silent = true })
+						if ok then
+							syde:Toast({
+								Content = "Autoloaded config: " .. desired;
+								Duration = 2
+							})
+							return
+						end
+					end
+					task.wait(0.2)
+				end
+
+				-- Final visible attempt to expose useful error if something is wrong.
+				syde:LoadSettingsConfig(desired, { Silent = false })
+			end)
 		end
 
 		local autoLoadData = syde:GetSettingsAutoloadData()
@@ -7382,7 +7556,7 @@ local function applyMinihomeInfoTransparency()
 					return
 				end
 				if v then
-					syde:LoadSettingsConfig(getActiveSettingsConfigName())
+					syde:AutoLoadSettingsConfig(getActiveSettingsConfigName())
 				end
 			end,
 			SFlag = "AUTOSET",
@@ -7403,9 +7577,7 @@ local function applyMinihomeInfoTransparency()
 		})
 
 		if autoLoadSettings then
-			task.defer(function()
-				syde:LoadSettingsConfig(selectedSettingsConfigName)
-			end)
+			syde:AutoLoadSettingsConfig(selectedSettingsConfigName)
 		end
 
 		b:Toggle({
@@ -10848,6 +11020,10 @@ local function applyMinihomeInfoTransparency()
 	return tbdata
 
 
+end
+
+if __sydeOverrideResult then
+	return __sydeOverrideResult
 end
 
 return syde
