@@ -173,9 +173,41 @@ local syde = {
 	Flags = {};
 	SettingsFlags = {};
 	UIAnimationsEnabled = true;
+	DebugEnabled = __sydeEnv and __sydeEnv.__SYDE_DEBUG_ENABLED == true or false;
+	DebugPrefix = "SYDE-DEBUG";
 };
 
 -- @Utilities
+
+function syde:SetDebug(enabled)
+	self.DebugEnabled = enabled == true
+	if __sydeEnv then
+		__sydeEnv.__SYDE_DEBUG_ENABLED = self.DebugEnabled
+	end
+	print(("[SYDE] Debug prints %s"):format(self.DebugEnabled and "enabled" or "disabled"))
+end
+
+function syde:IsDebugEnabled()
+	return self.DebugEnabled == true
+end
+
+function syde:_Debug(tag, message, ...)
+	if not self.DebugEnabled then
+		return
+	end
+
+	local text = message
+	if select("#", ...) > 0 then
+		local ok, formatted = pcall(string.format, message, ...)
+		if ok then
+			text = formatted
+		else
+			text = tostring(message)
+		end
+	end
+
+	print(("[%s][%s] %s"):format(self.DebugPrefix, tostring(tag or "General"), tostring(text)))
+end
 
 function syde:DeepMerge(target, source)
 	for k, v in pairs(source) do
@@ -1266,8 +1298,10 @@ local use24HourClock = false
 do
 
 	function syde:Load(Config)
+		Config = Config or {}
+		self:_Debug("Load", "syde:Load called (Name=%s, Status=%s)", tostring(Config.Name or "nil"), tostring(Config.Status or "nil"))
 		task.wait(1)
-		print('[SYED] Loader Loaded')
+		self:_Debug("Load", "Loader assets mounted")
 		local LOADER = Loader
 		LOADER.Enabled = true
 		LOADER.Parent = coregui
@@ -2280,6 +2314,7 @@ end
 
 function syde:Notify(Notification)
 	task.spawn(function()
+		syde:_Debug("Notify", "Notify called (Title=%s, Duration=%s)", tostring(Notification and Notification.Title or "nil"), tostring(Notification and Notification.Duration or "nil"))
 
 		local NotifData = {
 			Title = Notification.Title;
@@ -2300,7 +2335,7 @@ function syde:Notify(Notification)
 		Notification.Content.Text = NotifData.Content
 		Notification.Content.Size = UDim2.new(0, 200,0, Notification.Content.TextBounds.Y )
 		Notification.icon.Image = 'rbxassetid://'..NotifData.Icon
-		print(NotifData.Icon)
+		syde:_Debug("Notify", "Icon id resolved: %s", tostring(NotifData.Icon))
 		Notification.icon.Visible = true
 
 
@@ -2400,6 +2435,7 @@ local activeModals = 0 -- track how many modals are currently open
 
 function syde:Modal(Modal)
 	task.spawn(function()
+		syde:_Debug("Modal", "Modal opened (Title=%s)", tostring(Modal and Modal.Title or "nil"))
 		local ModalData = {
 			Title = Modal.Title;
 			Content = Modal.Content;
@@ -2921,6 +2957,7 @@ syde:HidePH(pages, 'page')
 
 --@@Initialize
 function syde:Init(library)
+	syde:_Debug("Init", "syde:Init called (Title=%s)", tostring(library and library.Title or "nil"))
 
 	ui.Enabled = true
 	if loaded == false then
@@ -7667,6 +7704,7 @@ local function applyMinihomeInfoTransparency()
 	}
 
 	function tbdata:InitTab(tab)
+		syde:_Debug("Tab", "InitTab called (Title=%s, Locked=%s)", tostring(tab and tab.Title or "nil"), tostring(tab and tab.Locked or false))
 		-- bootstrap Home-mode once so first-created tabs don't auto-open
 
 		if Data.Home.Enabled then
@@ -8260,6 +8298,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Button
 		function initelement:Button(Button)
+			syde:_Debug("Element", "Button created (Title=%s)", tostring(Button and Button.Title or "Temp Button"))
 			local data = {
 				Title = Button.Title or "Temp Button";
 				CallBack = Button.CallBack;
@@ -8441,6 +8480,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Toggle
 		function initelement:Toggle(Toggle)
+			syde:_Debug("Element", "Toggle created (Title=%s, Default=%s)", tostring(Toggle and Toggle.Title or "Temp Toggle"), tostring(Toggle and Toggle.Value or false))
 			local data = {
 				Title = Toggle.Title or "Temp Toggle";
 				Desc = Toggle.Description or "";
@@ -9102,10 +9142,12 @@ local function applyMinihomeInfoTransparency()
 
 		-- Compatibility aliases for older test/demo scripts
 		function initelement:CreateSlider(Slider)
+			syde:_Debug("Element", "CreateSlider alias invoked")
 			return self:Slider(Slider)
 		end
 
 		function initelement:Img(ImgData)
+			syde:_Debug("Element", "Image created (Title=%s)", tostring(ImgData and ImgData.Title or "Image"))
 			local data = {
 				Title = ImgData and (ImgData.Title or "Image") or "Image";
 				Image = ImgData and (ImgData.Image or ImgData.Id) or "";
@@ -9159,6 +9201,7 @@ local function applyMinihomeInfoTransparency()
 		end
 
 		function initelement:Rate(RateData)
+			syde:_Debug("Element", "Rate created (Title=%s)", tostring(RateData and RateData.Title or "Rating"))
 			local data = {
 				Title = (RateData and RateData.Title) or "Rating";
 				WebHook = (RateData and RateData.WebHook) or "";
@@ -9172,6 +9215,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@KeyBind
 		function initelement:Keybind(Keybind)
+			syde:_Debug("Element", "Keybind created (Title=%s, Key=%s)", tostring(Keybind and Keybind.Title or "nil"), tostring(Keybind and Keybind.Key and Keybind.Key.Name or "NONE"))
 			local data = {
 				Title = Keybind.Title;
 				Key = Keybind.Key;
@@ -9262,6 +9306,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@TextInput
 		function initelement:TextInput(TextInput)
+			syde:_Debug("Element", "TextInput created (Title=%s, NumberOnly=%s)", tostring(TextInput and TextInput.Title or "Text Input"), tostring(TextInput and TextInput.NumberOnly or false))
 			local data = {
 				Title = TextInput.Title or "Text Input",
 				PlaceHolder = TextInput.PlaceHolder or "Enter text...",
@@ -9685,6 +9730,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Labels/Paragraph
 		function initelement:Paragraph(Paragraph)
+			syde:_Debug("Element", "Paragraph created (Title=%s)", tostring(Paragraph and Paragraph.Title or "nil"))
 			local ParaData = {
 				Title = Paragraph.Title;
 				Content = Paragraph.Content;
@@ -9724,6 +9770,7 @@ local function applyMinihomeInfoTransparency()
 		end
 
 		function initelement:Label(Text, Alignment)
+			syde:_Debug("Element", "Label created (Text=%s, Alignment=%s)", tostring(Text), tostring(Alignment or "Left"))
 
 			local Label = pages.page.Label:Clone()
 			Label.Visible = true
@@ -9741,6 +9788,7 @@ local function applyMinihomeInfoTransparency()
 		end
 
 		function initelement:Section(Title, Icon)
+			syde:_Debug("Element", "Section created (Title=%s, Icon=%s)", tostring(Title), tostring(Icon or "nil"))
 			local SectionData = {
 				Title = Title
 			}
@@ -9761,6 +9809,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Dropdown
 		function initelement:Dropdown(Dropdown)
+			syde:_Debug("Element", "Dropdown created (Title=%s, Multi=%s)", tostring(Dropdown and Dropdown.Title or "Temp Dropdown"), tostring(Dropdown and Dropdown.Multi or false))
 			local data = {
 				Title = Dropdown.Title or "Temp Dropdown";
 				Options = Dropdown.Options or {};
@@ -10084,6 +10133,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Colorpicker
 		function initelement:ColorPicker(ColorPicker)
+			syde:_Debug("Element", "ColorPicker created (Title=%s, Linkable=%s)", tostring(ColorPicker and ColorPicker.Title or "nil"), tostring(ColorPicker and ColorPicker.Linkable))
 			local data = {
 				Title = ColorPicker.Title;
 				Color = ColorPicker.Color;
