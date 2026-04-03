@@ -2083,9 +2083,11 @@ local rainbowModeEnabled = false
 local rainbowModeConnection = nil
 local rainbowHue = math.random()
 local rainbowOriginalTheme = nil
+local rainbowOriginalWallpaper = nil
 local rainbowOriginalTextColors = {}
 local rainbowOriginalStrokeColors = {}
 local rainbowOriginalImageColors = {}
+local RAINBOW_MODE_WALLPAPER = "https://c4.wallpaperflare.com/wallpaper/581/460/967/nyan-cat-wallpaper-preview.jpg"
 
 local function clearRainbowOriginals()
 	table.clear(rainbowOriginalTextColors)
@@ -2173,6 +2175,12 @@ local function restoreRainbowState()
 		end
 	end
 
+	if rainbowOriginalWallpaper then
+		window.wallpaper.Image = rainbowOriginalWallpaper.Image
+		window.wallpaper.Visible = rainbowOriginalWallpaper.Visible
+		window.wallpaper.ison.Value = rainbowOriginalWallpaper.IsOn
+	end
+
 	local pluginsButton = top.functions and top.functions:FindFirstChild("plugins")
 	if pluginsButton and pluginsButton:FindFirstChild("rainbow") then
 		tweenOrSet(pluginsButton.rainbow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { ImageTransparency = 1 })
@@ -2194,6 +2202,20 @@ local function setRainbowMode(enabled)
 			Accent = syde.theme.Accent;
 			HitBox = syde.theme.HitBox;
 		}
+		rainbowOriginalWallpaper = {
+			Image = window.wallpaper.Image;
+			Visible = window.wallpaper.Visible;
+			IsOn = window.wallpaper.ison.Value;
+		}
+
+		local rainbowWallpaperSource = RAINBOW_MODE_WALLPAPER
+		local resolvedWallpaper = resolveWallpaperSource(rainbowWallpaperSource)
+		if resolvedWallpaper then
+			rainbowWallpaperSource = resolvedWallpaper
+		end
+		window.wallpaper.Image = rainbowWallpaperSource
+		window.wallpaper.Visible = true
+		window.wallpaper.ison.Value = true
 
 		captureRainbowTargets()
 
