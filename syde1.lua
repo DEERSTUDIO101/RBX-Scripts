@@ -121,7 +121,7 @@ local syde = {
 	Flags = {};
 	SettingsFlags = {};
 	UIAnimationsEnabled = true;
-}
+};
 
 -- @Utilities
 
@@ -6228,6 +6228,7 @@ local function applyMinihomeInfoTransparency()
 					ClearOnLost = TextInput.ClearOnLost == nil and true or TextInput.ClearOnLost,
 					--	MaxSize = TextInput.MaxSize or 100,
 					CallBack = TextInput.CallBack,
+					OnChanged = TextInput.OnChanged,
 				}
 
 				local textinput =  window.settings.pages.page.Input:Clone()
@@ -6271,6 +6272,15 @@ local function applyMinihomeInfoTransparency()
 
 					end
 
+					if typeof(data.OnChanged) == "function" then
+						local ok, err = pcall(function()
+							data.OnChanged(textBox.Text)
+						end)
+						if not ok then
+							warn("Error in TextInput OnChanged [" .. textinput.Name .. "]: " .. tostring(err))
+						end
+					end
+
 				end)
 
 				textinput.TextFrame:GetPropertyChangedSignal("Size"):Connect(function()
@@ -6305,23 +6315,21 @@ local function applyMinihomeInfoTransparency()
 				end)
 
 				local function ProcessInput(text)
-					local success, errorMsg = pcall(function()
+					if typeof(data.CallBack) ~= "function" then
+						return
+					end
+					local ok, err = pcall(function()
 						data.CallBack(text)
 					end)
-					if not success then
-						warn("Error in TextInput callback [" .. textinput.Name .. "]: " .. tostring(errorMsg))
+					if not ok then
+						warn("Error in TextInput callback [" .. textinput.Name .. "]: " .. tostring(err))
 					end
 				end
 
 				textBox.FocusLost:Connect(function(enterPressed)
 					if not enterPressed then return end
 
-					local success, errorMsg = pcall(function()
-						data.CallBack(textBox.Text)
-					end)
-					if not success then
-						warn("Error in TextInput callback [" .. textinput.Name .. "]: " .. tostring(errorMsg))
-					end
+					ProcessInput(textBox.Text)
 
 					if data.ClearOnLost then
 						task.defer(function()
@@ -6334,12 +6342,7 @@ local function applyMinihomeInfoTransparency()
 				end)
 
 				textinput.TextFrame.Enter.MouseButton1Click:Connect(function()
-					local success, errorMsg = pcall(function()
-						data.CallBack(textBox.Text)
-					end)
-					if not success then
-						warn("Error in TextInput callback [" .. textinput.Name .. "]: " .. tostring(errorMsg))
-					end
+					ProcessInput(textBox.Text)
 
 					if data.ClearOnLost then
 						task.defer(function()
@@ -6864,27 +6867,26 @@ local function applyMinihomeInfoTransparency()
 		end
 
 		function syde:EnsureSettingsConfigFolders()
-			if type(makefolder) ~= "function" or type(isfolder) ~= "function" then
+			if type(makefolder) ~= "function" then
 				return
 			end
 
-			if not isfolder(syde.ConfigFolder) then
-				pcall(function()
-					makefolder(syde.ConfigFolder)
-				end)
-			end
-
+			pcall(function()
+				makefolder(syde.ConfigFolder)
+			end)
 			local configFolder = syde:GetSettingsConfigFolderPath()
-			if not isfolder(configFolder) then
-				pcall(function()
-					makefolder(configFolder)
-				end)
-			end
+			pcall(function()
+				makefolder(configFolder)
+			end)
 		end
 
 		function syde:ListSettingsConfigs()
 			local configs = {}
 			local seen = {}
+			local ignoredRootFiles = {
+				["SettingsAutoload"] = true,
+				["SettingsConfig"] = true
+			}
 			local configFolder = syde:GetSettingsConfigFolderPath()
 
 			if type(listfiles) == "function" and type(isfolder) == "function" and isfolder(configFolder) then
@@ -6906,6 +6908,22 @@ local function applyMinihomeInfoTransparency()
 			local legacyPath = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
 			if type(isfile) == "function" and isfile(legacyPath) then
 				seen["Default"] = true
+			end
+
+			if type(listfiles) == "function" and type(isfolder) == "function" and isfolder(syde.ConfigFolder) then
+				local ok, files = pcall(function()
+					return listfiles(syde.ConfigFolder)
+				end)
+				if ok and type(files) == "table" then
+					for _, filePath in ipairs(files) do
+						local normalized = tostring(filePath):gsub("\\", "/")
+						local fileName = normalized:match("([^/]+)$")
+						local configName = fileName and fileName:match("^(.-)%.json$")
+						if configName and configName ~= "" and not ignoredRootFiles[configName] then
+							seen[configName] = true
+						end
+					end
+				end
 			end
 
 			for name in pairs(seen) do
@@ -7014,11 +7032,27 @@ local function applyMinihomeInfoTransparency()
 
 
 			local encoded = https:JSONEncode(Data)
-
-			writefile(path, encoded)
+			local saved = pcall(function()
+				writefile(path, encoded)
+			end)
+			if not saved then
+				local fallbackPath = string.format("%s/%s.json", syde.ConfigFolder, cleanedName)
+				saved = pcall(function()
+					writefile(fallbackPath, encoded)
+				end)
+			end
+			if not saved then
+				syde:Toast({
+					Content = "Failed to save config: " .. cleanedName;
+					Duration = 4
+				})
+				return false
+			end
 			if cleanedName == "Default" then
 				local legacyPath = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
-				writefile(legacyPath, encoded)
+				pcall(function()
+					writefile(legacyPath, encoded)
+				end)
 			end
 			syde:SetLastUsedSettingsConfig(cleanedName)
 
@@ -7120,6 +7154,12 @@ local function applyMinihomeInfoTransparency()
 			Title = 'Config Name',
 			PlaceHolder = 'Name your config (e.g. Alps)';
 			ClearOnLost = false,
+			OnChanged = function(v)
+				local raw = tostring(v or ""):gsub("^%s*(.-)%s*$", "%1")
+				if raw ~= "" then
+					selectedSettingsConfigName = syde:NormalizeSettingsConfigName(raw)
+				end
+			end,
 			CallBack = function(v)
 				local raw = tostring(v or ""):gsub("^%s*(.-)%s*$", "%1")
 				if raw ~= "" then
