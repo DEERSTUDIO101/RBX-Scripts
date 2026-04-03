@@ -1841,6 +1841,110 @@ local function normalizeImageSource(imageValue)
 	return asString
 end
 
+local function getRequestFunction()
+	if syn and syn.request then
+		return syn.request
+	end
+	if http_request then
+		return http_request
+	end
+	if request then
+		return request
+	end
+	if http and http.request then
+		return http.request
+	end
+	return nil
+end
+
+local function getLocalAssetFunction()
+	if getsynasset then
+		return getsynasset
+	end
+	if getcustomasset then
+		return getcustomasset
+	end
+	return nil
+end
+
+local function normalizeFileName(text)
+	local name = tostring(text or ""):gsub("[^%w_%-]", "_")
+	if name == "" then
+		name = "wallpaper"
+	end
+	if #name > 80 then
+		name = name:sub(1, 80)
+	end
+	return name
+end
+
+local function resolveWallpaperSource(rawSource)
+	local source = normalizeImageSource(rawSource)
+	if source == "" then
+		return nil, "Empty wallpaper source."
+	end
+
+	local isHttp = source:match("^https?://") ~= nil
+	local isAsset = source:match("^rbxassetid://") ~= nil
+	if isAsset then
+		return source, nil
+	end
+	if not isHttp then
+		return nil, "Invalid source. Use Roblox ID, rbxassetid:// or full https:// URL."
+	end
+
+	local requestFn = getRequestFunction()
+	local localAssetFn = getLocalAssetFunction()
+	if not (requestFn and localAssetFn and type(writefile) == "function") then
+		return source, nil
+	end
+
+	local cacheDir = string.format("%s/WallpaperCache", syde.ConfigFolder)
+	if type(makefolder) == "function" and type(isfolder) == "function" and not isfolder(cacheDir) then
+		pcall(function()
+			makefolder(cacheDir)
+		end)
+	end
+
+	local ext = source:match("%.([%a%d]+)$")
+	if not ext then
+		ext = source:match("%.([%a%d]+)%?")
+	end
+	ext = (ext or "jpg"):lower()
+
+	local safeFileName = normalizeFileName(source)
+	local localPath = string.format("%s/%s.%s", cacheDir, safeFileName, ext)
+
+	local ok, response = pcall(function()
+		return requestFn({
+			Url = source,
+			Method = "GET"
+		})
+	end)
+	if not ok or not response or not response.Body or response.Body == "" then
+		return source, nil
+	end
+	if response.Success == false then
+		return source, nil
+	end
+
+	local wrote = pcall(function()
+		writefile(localPath, response.Body)
+	end)
+	if not wrote then
+		return source, nil
+	end
+
+	local okAsset, asset = pcall(function()
+		return localAssetFn(localPath)
+	end)
+	if okAsset and asset then
+		return asset, nil
+	end
+
+	return source, nil
+end
+
 local function applyTopFunctionBackgrounds(animated)
 	local duration = (animated and uiAnimationsEnabled) and 0.4 or 0
 	local target = getTopFunctionBaseTransparency()
@@ -1918,6 +2022,157 @@ local function applyAnimationMode()
 		if node:IsA("ScrollingFrame") then
 			node.ElasticBehavior = elastic
 		end
+	end
+end
+
+local rainbowModeEnabled = false
+local rainbowModeConnection = nil
+local rainbowHue = math.random()
+local rainbowOriginalTheme = nil
+local rainbowOriginalWallpaper = nil
+local rainbowOriginalTextColors = {}
+local rainbowOriginalStrokeColors = {}
+local rainbowOriginalImageColors = {}
+
+local function clearRainbowOriginals()
+	table.clear(rainbowOriginalTextColors)
+	table.clear(rainbowOriginalStrokeColors)
+	table.clear(rainbowOriginalImageColors)
+end
+
+local function shouldTintRainbowImage(node)
+	if not (node and node.Parent) then
+		return false
+	end
+	if node == window.wallpaper then
+		return false
+	end
+	if node.Name == "headshot" or node.Parent.Name == "headshot" then
+		return false
+	end
+	if top and top:FindFirstChild("functions") and node:IsDescendantOf(top.functions) then
+		return true
+	end
+	if node.Parent:FindFirstChild("interact") or (node.Parent.Parent and node.Parent.Parent:FindFirstChild("interact")) then
+		return true
+	end
+	return false
+end
+
+local function captureRainbowTargets()
+	clearRainbowOriginals()
+
+	for _, node in ipairs(window:GetDescendants()) do
+		if node:IsA("TextLabel") or node:IsA("TextButton") then
+			rainbowOriginalTextColors[node] = node.TextColor3
+		elseif node:IsA("UIStroke") then
+			rainbowOriginalStrokeColors[node] = node.Color
+		elseif (node:IsA("ImageLabel") or node:IsA("ImageButton")) and shouldTintRainbowImage(node) then
+			rainbowOriginalImageColors[node] = node.ImageColor3
+		end
+	end
+end
+
+local function applyRainbowColor(color)
+	syde:UpdateTheme({
+		Accent = color;
+		HitBox = color;
+	})
+
+	for node in pairs(rainbowOriginalTextColors) do
+		if node and node.Parent then
+			node.TextColor3 = color
+		end
+	end
+	for node in pairs(rainbowOriginalStrokeColors) do
+		if node and node.Parent then
+			node.Color = color
+		end
+	end
+	for node in pairs(rainbowOriginalImageColors) do
+		if node and node.Parent then
+			node.ImageColor3 = color
+		end
+	end
+end
+
+local function restoreRainbowState()
+	if rainbowOriginalTheme then
+		syde:UpdateTheme({
+			Accent = rainbowOriginalTheme.Accent;
+			HitBox = rainbowOriginalTheme.HitBox;
+		})
+	end
+
+	for node, original in pairs(rainbowOriginalTextColors) do
+		if node and node.Parent then
+			node.TextColor3 = original
+		end
+	end
+	for node, original in pairs(rainbowOriginalStrokeColors) do
+		if node and node.Parent then
+			node.Color = original
+		end
+	end
+	for node, original in pairs(rainbowOriginalImageColors) do
+		if node and node.Parent then
+			node.ImageColor3 = original
+		end
+	end
+
+	if rainbowOriginalWallpaper then
+		window.wallpaper.Image = rainbowOriginalWallpaper.Image
+		window.wallpaper.Visible = rainbowOriginalWallpaper.Visible
+		window.wallpaper.ison.Value = rainbowOriginalWallpaper.IsOn
+	end
+
+	local pluginsButton = top.functions and top.functions:FindFirstChild("plugins")
+	if pluginsButton and pluginsButton:FindFirstChild("rainbow") then
+		tweenOrSet(pluginsButton.rainbow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { ImageTransparency = 1 })
+	end
+
+	clearRainbowOriginals()
+end
+
+local function setRainbowMode(enabled)
+	if rainbowModeEnabled == enabled then
+		return
+	end
+
+	rainbowModeEnabled = enabled
+	local pluginsButton = top.functions and top.functions:FindFirstChild("plugins")
+
+	if enabled then
+		rainbowOriginalTheme = {
+			Accent = syde.theme.Accent;
+			HitBox = syde.theme.HitBox;
+		}
+		rainbowOriginalWallpaper = {
+			Image = window.wallpaper.Image;
+			Visible = window.wallpaper.Visible;
+			IsOn = window.wallpaper.ison.Value;
+		}
+
+		window.wallpaper.Image = "rbxassetid://50591400"
+		window.wallpaper.Visible = true
+		window.wallpaper.ison.Value = true
+
+		captureRainbowTargets()
+
+		if pluginsButton and pluginsButton:FindFirstChild("rainbow") then
+			tweenOrSet(pluginsButton.rainbow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { ImageTransparency = 0 })
+		end
+
+		rainbowModeConnection = runservice.RenderStepped:Connect(function(dt)
+			rainbowHue = (rainbowHue + dt * 0.2) % 1
+			applyRainbowColor(Color3.fromHSV(rainbowHue, 1, 1))
+		end)
+	else
+		if rainbowModeConnection then
+			rainbowModeConnection:Disconnect()
+			rainbowModeConnection = nil
+		end
+		restoreRainbowState()
 	end
 end
 
@@ -2546,6 +2801,7 @@ window.top.functions.close.interact.MouseButton1Click:Connect(function()
 		Content = 'Are You Sure You Want To Close This UI?',
 		ConfimCallBack = function()
 			mh = false
+			setRainbowMode(false)
 			rs:Disconnect()
 			ss:Disconnect()
 			--	if not ui.Parent then return end
@@ -2858,7 +3114,10 @@ local function applyMinihomeInfoTransparency()
 
 
 			if v.Name == "plugins" and gradient then
-				tweenservice:Create(v.rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+				tweenOrSet(v.rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 })
+				if rainbowModeEnabled then
+					return
+				end
 				local state = RainbowStates[v]
 				if state.connection then return end
 
@@ -2893,7 +3152,17 @@ local function applyMinihomeInfoTransparency()
 
 
 			if v.Name == "plugins" then
-				tweenservice:Create(v.rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+				if rainbowModeEnabled then
+					tweenOrSet(v.rainbow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { ImageTransparency = 0 })
+					local state = RainbowStates[v]
+					if state and state.connection then
+						state.connection:Disconnect()
+						state.connection = nil
+					end
+					return
+				end
+
+				tweenOrSet(v.rainbow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 })
 				local state = RainbowStates[v]
 				if state and state.connection then
 					state.connection:Disconnect()
@@ -2931,6 +3200,12 @@ local function applyMinihomeInfoTransparency()
 			debounce = false
 		end)
 	end)
+
+	if top.functions:FindFirstChild("plugins") and top.functions.plugins:FindFirstChild("interact") then
+		top.functions.plugins.interact.MouseButton1Click:Connect(function()
+			setRainbowMode(not rainbowModeEnabled)
+		end)
+	end
 
 
 
@@ -6389,17 +6664,10 @@ local function applyMinihomeInfoTransparency()
 			NumberOnly = false;
 			PlaceHolder = 'Use Roblox ID or image URL (https://...)';
 			CallBack = function (v)
-				local raw = tostring(v or ""):gsub("^%s*(.-)%s*$", "%1")
-				if raw == "" then
-					return
-				end
-
-				local source = normalizeImageSource(raw)
-				local isUrl = source:match("^https?://") ~= nil
-				local isAsset = source:match("^rbxassetid://") ~= nil
-				if not (isUrl or isAsset) then
+				local source, err = resolveWallpaperSource(v)
+				if not source then
 					syde:Toast({
-						Content = 'Invalid source. Use a Roblox ID or full image URL.';
+						Content = err or 'Wallpaper source is invalid.';
 						Duration = 4;
 					})
 					return
@@ -6407,18 +6675,14 @@ local function applyMinihomeInfoTransparency()
 
 				local ok = pcall(function()
 					window.wallpaper.Image = source
+					window.wallpaper.Visible = true
+					window.wallpaper.ison.Value = true
 				end)
 
-				if ok then
-					syde:Toast({
-						Content = 'Wallpaper applied.'
-					})
-				else
-					syde:Toast({
-						Content = 'Wallpaper could not be applied.';
-						Duration = 4;
-					})
-				end
+				syde:Toast({
+					Content = ok and 'Wallpaper applied.' or 'Wallpaper could not be applied.';
+					Duration = ok and 3 or 4;
+				})
 			end
 		})
 
@@ -6581,54 +6845,157 @@ local function applyMinihomeInfoTransparency()
 			return string.format("%s/SettingsAutoload.json", syde.ConfigFolder)
 		end
 
-		function syde:GetSettingsAutoload()
+		function syde:NormalizeSettingsConfigName(name)
+			local cleaned = tostring(name or ""):gsub("^%s*(.-)%s*$", "%1")
+			cleaned = cleaned:gsub("[\\/:*?\"<>|]", "_")
+			if cleaned == "" then
+				cleaned = "Default"
+			end
+			return cleaned
+		end
+
+		function syde:GetSettingsConfigFolderPath()
+			return string.format("%s/SettingsConfigs", syde.ConfigFolder)
+		end
+
+		function syde:GetSettingsConfigPath(name)
+			local cleaned = syde:NormalizeSettingsConfigName(name)
+			return string.format("%s/%s.json", syde:GetSettingsConfigFolderPath(), cleaned), cleaned
+		end
+
+		function syde:EnsureSettingsConfigFolders()
+			if type(makefolder) ~= "function" or type(isfolder) ~= "function" then
+				return
+			end
+
+			if not isfolder(syde.ConfigFolder) then
+				pcall(function()
+					makefolder(syde.ConfigFolder)
+				end)
+			end
+
+			local configFolder = syde:GetSettingsConfigFolderPath()
+			if not isfolder(configFolder) then
+				pcall(function()
+					makefolder(configFolder)
+				end)
+			end
+		end
+
+		function syde:ListSettingsConfigs()
+			local configs = {}
+			local seen = {}
+			local configFolder = syde:GetSettingsConfigFolderPath()
+
+			if type(listfiles) == "function" and type(isfolder) == "function" and isfolder(configFolder) then
+				local ok, files = pcall(function()
+					return listfiles(configFolder)
+				end)
+				if ok and type(files) == "table" then
+					for _, filePath in ipairs(files) do
+						local normalized = tostring(filePath):gsub("\\", "/")
+						local fileName = normalized:match("([^/]+)$")
+						local configName = fileName and fileName:match("^(.-)%.json$")
+						if configName and configName ~= "" then
+							seen[configName] = true
+						end
+					end
+				end
+			end
+
+			local legacyPath = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
+			if type(isfile) == "function" and isfile(legacyPath) then
+				seen["Default"] = true
+			end
+
+			for name in pairs(seen) do
+				table.insert(configs, name)
+			end
+
+			table.sort(configs, function(a, b)
+				return a:lower() < b:lower()
+			end)
+
+			if #configs == 0 then
+				table.insert(configs, "Default")
+			end
+
+			return configs
+		end
+
+		function syde:GetSettingsAutoloadData()
+			local defaultData = {
+				Enabled = false,
+				LastConfig = "Default"
+			}
+
 			if type(isfile) ~= "function" or type(readfile) ~= "function" then
-				return false
+				return defaultData
 			end
 
 			local path = syde:GetSettingsAutoloadPath()
 			if not isfile(path) then
-				return false
+				return defaultData
 			end
 
 			local ok, decoded = pcall(function()
 				return https:JSONDecode(readfile(path))
 			end)
-
-			if ok and typeof(decoded) == "table" then
-				return decoded.Enabled == true
+			if not ok then
+				return defaultData
 			end
 
-			return false
+			if typeof(decoded) == "table" then
+				return {
+					Enabled = decoded.Enabled == true,
+					LastConfig = syde:NormalizeSettingsConfigName(decoded.LastConfig or "Default")
+				}
+			end
+
+			return defaultData
 		end
 
-		function syde:SetSettingsAutoload(enabled)
+		function syde:GetSettingsAutoload()
+			return syde:GetSettingsAutoloadData().Enabled
+		end
+
+		function syde:GetLastUsedSettingsConfig()
+			return syde:GetSettingsAutoloadData().LastConfig
+		end
+
+		function syde:SetSettingsAutoload(enabled, lastConfig)
 			if type(writefile) ~= "function" then
 				return false
 			end
 
-			if type(makefolder) == "function" and type(isfolder) == "function" and not isfolder(syde.ConfigFolder) then
-				makefolder(syde.ConfigFolder)
-			end
+			syde:EnsureSettingsConfigFolders()
 
 			local path = syde:GetSettingsAutoloadPath()
 			local payload = https:JSONEncode({
-				Enabled = enabled == true
+				Enabled = enabled == true,
+				LastConfig = syde:NormalizeSettingsConfigName(lastConfig or syde:GetLastUsedSettingsConfig())
 			})
 			writefile(path, payload)
 			return true
 		end
 
+		function syde:SetLastUsedSettingsConfig(name)
+			local autoloadData = syde:GetSettingsAutoloadData()
+			return syde:SetSettingsAutoload(autoloadData.Enabled, name)
+		end
 
-		function syde:SaveSettingsConfig()
+
+		function syde:SaveSettingsConfig(configName)
 			if type(writefile) ~= "function" then
 				syde:Toast({
 					Content = 'Save not supported in this environment';
 					Duration = 3
 				})
-				return
+				return false
 			end
 
+			syde:EnsureSettingsConfigFolders()
+			local path, cleanedName = syde:GetSettingsConfigPath(configName)
 			local Data = {}
 
 
@@ -6646,35 +7013,44 @@ local function applyMinihomeInfoTransparency()
 			end
 
 
-			local path = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
 			local encoded = https:JSONEncode(Data)
 
 			writefile(path, encoded)
+			if cleanedName == "Default" then
+				local legacyPath = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
+				writefile(legacyPath, encoded)
+			end
+			syde:SetLastUsedSettingsConfig(cleanedName)
 
 			syde:Toast({
-				Content = 'Saved setting config';
+				Content = "Saved config: " .. cleanedName;
 				Duration = 3
 			})
+			return true, cleanedName
 		end
 
-		function syde:LoadSettingsConfig()
+		function syde:LoadSettingsConfig(configName)
 			if type(isfile) ~= "function" or type(readfile) ~= "function" then
 				syde:Toast({
 					Content = 'Load not supported in this environment';
 					Duration = 3
 				})
-				return
+				return false
 			end
 
-			local path = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
+			local path, cleanedName = syde:GetSettingsConfigPath(configName)
+			local legacyPath = string.format("%s/SettingsConfig.lua", syde.ConfigFolder)
+			if not isfile(path) and cleanedName == "Default" and isfile(legacyPath) then
+				path = legacyPath
+			end
 
 			if not isfile(path) then
 
 				syde:Toast({
-					Content = 'No settings found';
+					Content = "No config found: " .. cleanedName;
 					Duration = 3
 				})
-				return
+				return false
 			end
 
 			local success, data = pcall(function()
@@ -6728,9 +7104,63 @@ local function applyMinihomeInfoTransparency()
 				end
 			end
 
+			syde:SetLastUsedSettingsConfig(cleanedName)
+
 			syde:Toast({
-				Content = 'Loaded setting config';
+				Content = "Loaded config: " .. cleanedName;
 				Duration = 3
+			})
+			return true, cleanedName
+		end
+
+		local autoLoadData = syde:GetSettingsAutoloadData()
+		local selectedSettingsConfigName = syde:NormalizeSettingsConfigName(autoLoadData.LastConfig)
+
+		a:TextInput({
+			Title = 'Config Name',
+			PlaceHolder = 'Name your config (e.g. Alps)';
+			ClearOnLost = false,
+			CallBack = function(v)
+				local raw = tostring(v or ""):gsub("^%s*(.-)%s*$", "%1")
+				if raw ~= "" then
+					selectedSettingsConfigName = syde:NormalizeSettingsConfigName(raw)
+				end
+			end
+		})
+
+		local configDropdownTitle = "Saved Configs"
+		local function getActiveSettingsConfigName()
+			return syde:NormalizeSettingsConfigName(selectedSettingsConfigName)
+		end
+
+		local function rebuildSettingsConfigDropdown()
+			local themePage = window.settings and window.settings.pages and window.settings.pages:FindFirstChild("Theme")
+			if themePage then
+				local existing = themePage:FindFirstChild(configDropdownTitle)
+				if existing and existing:IsA("Frame") then
+					existing:Destroy()
+				end
+			end
+
+			local configs = syde:ListSettingsConfigs()
+			if #configs <= 2 then
+				return
+			end
+
+			local starter = table.find(configs, selectedSettingsConfigName) and selectedSettingsConfigName or configs[1]
+			selectedSettingsConfigName = starter
+
+			a:Dropdown({
+				Title = configDropdownTitle,
+				Options = configs,
+				StarterOption = starter,
+				PlaceHolder = 'Select saved config...';
+				Multi = false,
+				CallBack = function(choice)
+					if typeof(choice) == "string" and choice ~= "" then
+						selectedSettingsConfigName = syde:NormalizeSettingsConfigName(choice)
+					end
+				end
 			})
 		end
 
@@ -6738,24 +7168,33 @@ local function applyMinihomeInfoTransparency()
 			Title = 'Save',
 			Description = 'Save all setting configurations.',
 			CallBack = function ()
-				syde:SaveSettingsConfig()
+				local ok, usedName = syde:SaveSettingsConfig(getActiveSettingsConfigName())
+				if ok and usedName then
+					selectedSettingsConfigName = usedName
+					rebuildSettingsConfigDropdown()
+				end
 			end
 		})
 		a:Button({
 			Title = 'Load',
 			Description = 'Load all setting configurations.',
 			CallBack = function ()
-				syde:LoadSettingsConfig()
+				local ok, usedName = syde:LoadSettingsConfig(getActiveSettingsConfigName())
+				if ok and usedName then
+					selectedSettingsConfigName = usedName
+				end
 			end
 		})
 
-		local autoLoadSettings = syde:GetSettingsAutoload()
+		rebuildSettingsConfigDropdown()
+
+		local autoLoadSettings = autoLoadData.Enabled
 		a:Toggle({
 			Title = 'Autoload Settings',
-			Description = 'Automatically load saved theme settings on startup.',
+			Description = 'Automatically load the last used named config on startup.',
 			Value = autoLoadSettings,
 			CallBack = function(v)
-				local saved = syde:SetSettingsAutoload(v)
+				local saved = syde:SetSettingsAutoload(v, getActiveSettingsConfigName())
 				if not saved then
 					syde:Toast({
 						Content = 'Autoload file not supported in this environment';
@@ -6763,7 +7202,7 @@ local function applyMinihomeInfoTransparency()
 					})
 				end
 				if v then
-					syde:LoadSettingsConfig()
+					syde:LoadSettingsConfig(getActiveSettingsConfigName())
 				end
 			end,
 			SFlag = 'AUTOSET',
@@ -6785,7 +7224,7 @@ local function applyMinihomeInfoTransparency()
 
 		if autoLoadSettings then
 			task.defer(function()
-				syde:LoadSettingsConfig()
+				syde:LoadSettingsConfig(selectedSettingsConfigName)
 			end)
 		end
 
