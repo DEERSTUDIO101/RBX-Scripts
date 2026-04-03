@@ -2087,7 +2087,7 @@ local rainbowOriginalWallpaper = nil
 local rainbowOriginalTextColors = {}
 local rainbowOriginalStrokeColors = {}
 local rainbowOriginalImageColors = {}
-local RAINBOW_MODE_WALLPAPER = "https://c4.wallpaperflare.com/wallpaper/581/460/967/nyan-cat-wallpaper-preview.jpg"
+local RAINBOW_MODE_WALLPAPER = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQGwP-lrDJDnhl4cgiHftwT2Wmuh1J1ICQy0g&s"
 
 local function clearRainbowOriginals()
 	table.clear(rainbowOriginalTextColors)
