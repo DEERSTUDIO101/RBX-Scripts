@@ -1512,11 +1512,13 @@ do
 					end
 				end
 
-				-- File validation
+				-- File validation (guard read/write functions to avoid nil-call in restricted executors)
 				local success, err = pcall(function()
-					if isfile and not isfile(fullPath) then
-						writefile(fullPath, "-- Protected UI Configuration")
-					else
+					if type(isfile) == "function" and not isfile(fullPath) then
+						if type(writefile) == "function" then
+							writefile(fullPath, "-- Protected UI Configuration")
+						end
+					elseif type(readfile) == "function" then
 						local content = readfile(fullPath)
 					end
 				end)
@@ -2081,7 +2083,6 @@ local rainbowModeEnabled = false
 local rainbowModeConnection = nil
 local rainbowHue = math.random()
 local rainbowOriginalTheme = nil
-local rainbowOriginalWallpaper = nil
 local rainbowOriginalTextColors = {}
 local rainbowOriginalStrokeColors = {}
 local rainbowOriginalImageColors = {}
@@ -2172,12 +2173,6 @@ local function restoreRainbowState()
 		end
 	end
 
-	if rainbowOriginalWallpaper then
-		window.wallpaper.Image = rainbowOriginalWallpaper.Image
-		window.wallpaper.Visible = rainbowOriginalWallpaper.Visible
-		window.wallpaper.ison.Value = rainbowOriginalWallpaper.IsOn
-	end
-
 	local pluginsButton = top.functions and top.functions:FindFirstChild("plugins")
 	if pluginsButton and pluginsButton:FindFirstChild("rainbow") then
 		tweenOrSet(pluginsButton.rainbow, TweenInfo.new(0.25, Enum.EasingStyle.Exponential), { ImageTransparency = 1 })
@@ -2199,15 +2194,6 @@ local function setRainbowMode(enabled)
 			Accent = syde.theme.Accent;
 			HitBox = syde.theme.HitBox;
 		}
-		rainbowOriginalWallpaper = {
-			Image = window.wallpaper.Image;
-			Visible = window.wallpaper.Visible;
-			IsOn = window.wallpaper.ison.Value;
-		}
-
-		window.wallpaper.Image = "rbxassetid://50591400"
-		window.wallpaper.Visible = true
-		window.wallpaper.ison.Value = true
 
 		captureRainbowTargets()
 
@@ -6562,38 +6548,48 @@ local function applyMinihomeInfoTransparency()
 		})]]
 
 		local rotateGradient = false
-		local rotating = false
+		local gradientRotationConnection = nil
+		local gradientRotationSpeed = 12
 		if window.shadow and window.shadow.ImageLabel and window.shadow.ImageLabel:FindFirstChild("UIGradient") then
 			window.shadow.ImageLabel.UIGradient.Rotation = 0
 		end
 
 		local function startGradientRotation()
-			if rotating then return end
-			rotating = true
-
-			task.spawn(function()
-				local grad = window.shadow.ImageLabel.UIGradient
-				local rotation = 0
-				while rotateGradient and grad and grad.Enabled do
-					rotation = (rotation + 1) % 360
-					grad.Rotation = rotation
-					task.wait() -- adjust speed if you want
+			if gradientRotationConnection then return end
+			local grad = window.shadow and window.shadow.ImageLabel and window.shadow.ImageLabel:FindFirstChild("UIGradient")
+			if not grad then
+				return
+			end
+			gradientRotationConnection = runservice.RenderStepped:Connect(function(dt)
+				if not rotateGradient or not grad or not grad.Parent or not grad.Enabled then
+					if gradientRotationConnection then
+						gradientRotationConnection:Disconnect()
+						gradientRotationConnection = nil
+					end
+					return
 				end
-				rotating = false
+				grad.Rotation = (grad.Rotation + (gradientRotationSpeed * dt)) % 360
 			end)
 		end
 
 		a:Toggle({
 			Title = 'Rotate Gradient',
-			Description = 'Slowly rotates the gradient if enabled.',
+			Description = 'Slowly rotates the gradient if enabled',
 			Value = false,
 			CallBack = function(v)
 				rotateGradient = v
-				local grad = window.shadow.ImageLabel.UIGradient
+				local grad = window.shadow and window.shadow.ImageLabel and window.shadow.ImageLabel:FindFirstChild("UIGradient")
 
 				if rotateGradient and grad and grad.Enabled then
 					startGradientRotation()
-				elseif grad then
+				else
+					if gradientRotationConnection then
+						gradientRotationConnection:Disconnect()
+						gradientRotationConnection = nil
+					end
+				end
+
+				if not rotateGradient and grad then
 					grad.Rotation = 0
 				end
 			end,
@@ -6602,7 +6598,7 @@ local function applyMinihomeInfoTransparency()
 
 		a:Toggle({
 			Title = 'Glow',
-			Description = 'Shine on the ui.',
+			Description = 'Shine on the UI',
 			CallBack = function (v)
 				if v then
 					glow = true
@@ -6613,7 +6609,7 @@ local function applyMinihomeInfoTransparency()
 					end
 					window.pages.v0.Visible = false
 
-					window.pages.clipframe.v1.Visible = false
+					window.pages.clipframe.v0.Visible = false
 					window.pages.clipframe.v1.Visible = false
 
 					--		window.shadow.ImageLabel.Visible = false
@@ -6636,7 +6632,7 @@ local function applyMinihomeInfoTransparency()
 						window.pages.v0.Visible = false
 					else
 						window.pages.v0.Visible = true
-						window.pages.clipframe.v1.Visible = true
+						window.pages.clipframe.v0.Visible = true
 						window.pages.clipframe.v1.Visible = true
 					end
 				end
@@ -6646,7 +6642,7 @@ local function applyMinihomeInfoTransparency()
 
 		a:Toggle({
 			Title = 'Blur',
-			Description = 'Make sure your graphics are above 8.',
+			Description = 'Make sure your graphics are above 8',
 			CallBack = function (v)
 				if v then
 					window.shadow.ImageLabel.Visible = false
@@ -6741,7 +6737,7 @@ local function applyMinihomeInfoTransparency()
 		a:Toggle({
 			Title = 'Wallpaper';
 			Description = 'Displays personalized wallpaper';
-			Value = LockToScreen,
+			Value = window.wallpaper.ison.Value,
 			CallBack = function (v)
 				if v then
 					window.wallpaper.Visible = true
@@ -6789,12 +6785,13 @@ local function applyMinihomeInfoTransparency()
 
 				local ok = pcall(function()
 					window.wallpaper.Image = source
-					window.wallpaper.Visible = true
-					window.wallpaper.ison.Value = true
+					if window.wallpaper.ison.Value then
+						window.wallpaper.Visible = true
+					end
 				end)
 
 				syde:Toast({
-					Content = ok and 'Wallpaper applied.' or 'Wallpaper could not be applied.';
+					Content = ok and 'Wallpaper source updated.' or 'Wallpaper could not be applied.';
 					Duration = ok and 3 or 4;
 				})
 			end
