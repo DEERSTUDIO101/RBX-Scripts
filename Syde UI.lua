@@ -78,7 +78,9 @@ if update then
 		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(87, 101, 242)}):Play()
 		tweenservice:Create(updategui.main.s2.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
 		if setclipboard then
-			setclipboard(cord)
+			pcall(function()
+				setclipboard("https://discord.gg" .. cord)
+			end)
 		end
 	end)
 end
@@ -118,6 +120,7 @@ local syde = {
 	ConfigFile = 'Config';
 	Flags = {};
 	SettingsFlags = {};
+	UIAnimationsEnabled = true;
 }
 
 -- @Utilities
@@ -960,12 +963,19 @@ end
 
 function syde:replayLoadTweens(targetObject)
 	syde:resetToInitialState(false)
+	local animationsEnabled = syde.UIAnimationsEnabled ~= false
 
 	for object, tweenData in pairs(loadTweens) do
 		if object and object.Parent then
 			if not targetObject or object == targetObject then
 				tweenData.tween:Cancel()
-				tweenData.tween:Play()
+				if animationsEnabled then
+					tweenData.tween:Play()
+				else
+					for property, value in pairs(tweenData.properties) do
+						object[property] = value
+					end
+				end
 			end
 		end
 	end
@@ -1765,7 +1775,7 @@ local userinfodisabled = false
 local intro = false
 local bluron = false
 local glow = false
-local uiAnimationsEnabled = true
+local uiAnimationsEnabled = syde.UIAnimationsEnabled ~= false
 local activeBlurDof = nil
 
 local uitoggle = Enum.KeyCode.RightShift
@@ -2327,34 +2337,36 @@ function opensearch()
 
 
 	if window.search.Frame.TextBox.Text ~= '' then
-		tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 230) }):Play()
+		tweenOrSet(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 230) })
 	else
-		tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
+		tweenOrSet(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) })
 	end
 
-	tweenservice:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	tweenOrSet(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 })
+	tweenOrSet(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 })
+	tweenOrSet(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 })
 
-	tweenservice:Create(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+	tweenOrSet(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0 })
+	tweenOrSet(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0 })
 
-	tweenservice:Create(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
+	tweenOrSet(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0 })
 end
 
 function closesearch()
 	searchopen = false
 	window.search.Container.Visible = false
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) }):Play()
-	tweenservice:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-	tweenservice:Create(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	tweenOrSet(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { Size = UDim2.new(0, 350,0, 60) })
+	tweenOrSet(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1 })
+	tweenOrSet(window.search, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1})
+	tweenOrSet(window.search.Frame.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 })
 
-	tweenservice:Create(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-	tweenservice:Create(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 }):Play()
+	tweenOrSet(window.search.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1})
+	tweenOrSet(window.search.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 1 })
 
-	tweenservice:Create(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 }):Play()
-	task.wait(0.5)
+	tweenOrSet(window.search.Frame.TextBox, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 1 })
+	if uiAnimationsEnabled then
+		task.wait(0.5)
+	end
 	window.dim.Visible = false
 	window.search.Visible = false
 end
@@ -2373,39 +2385,39 @@ function openui()
 			Transparency = 0.98;
 			BrickColor = BrickColor.new('Institutional white');
 		})
-		tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.45 }):Play()
+		tweenOrSet(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.45 })
 	else
-		tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 }):Play()
+		tweenOrSet(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 })
 	end
-	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 700,0, 560) }):Play()
+	tweenOrSet(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 700,0, 560) })
 
-	tweenservice:Create(window.top.separator, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 }):Play()
-	tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
-	tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 }):Play()
+	tweenOrSet(window.top.separator, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0 })
+	tweenOrSet(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 })
+	tweenOrSet(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 0 })
 
-	tweenservice:Create(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
+	tweenOrSet(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
 		BackgroundTransparency = getTopFunctionsContainerTransparency()
-	}):Play()
+	})
 
 	if window.wallpaper.ison.Value  then
-		tweenservice:Create(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.84 }):Play()
+		tweenOrSet(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.84 })
 	end
 
 
 	for i,v in pairs(window.top.functions:GetChildren()) do
 		if v:IsA("Frame") then
-			tweenservice:Create(v, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
+			tweenOrSet(v, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {
 				BackgroundTransparency = getTopFunctionBaseTransparency()
-			}):Play()
+			})
 			v.Visible = true
 			for i,v2 in pairs(v:GetChildren()) do
 				if v2:IsA("ImageLabel") then
-					tweenservice:Create(v2, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0 }):Play()
+					tweenOrSet(v2, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0 })
 					v2.Visible = true
 				end
 			end
 			if v:FindFirstChild("rainbow") then
-				tweenservice:Create(v.rainbow, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+				tweenOrSet(v.rainbow, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 })
 			end
 
 		end
@@ -2413,18 +2425,18 @@ function openui()
 
 	applyTopFunctionBackgrounds(false)
 
-	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.5 }):Play()
-	tweenservice:Create(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.3}):Play()
+	tweenOrSet(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.5 })
+	tweenOrSet(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.3})
 
 	if glow == true then
 		for i, glow in pairs(window.clipframe:GetChildren()) do
 			if glow:IsA("ImageLabel") then
-				tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8}):Play()
+				tweenOrSet(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.8})
 			end
 		end
 
-		tweenservice:Create(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.9}):Play()
-		tweenservice:Create(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.9}):Play()
+		tweenOrSet(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.9})
+		tweenOrSet(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 0.9})
 	end
 
 
@@ -2435,29 +2447,29 @@ function closeui()
 	window.tabs.Visible = false
 	window.user.Visible = false
 
-	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 200) }):Play()
+	tweenOrSet(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 })
+	tweenOrSet(window, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(window.Size.X.Scale, window.Size.X.Offset, window.Size.Y.Scale, 200) })
 
-	tweenservice:Create(window.top.separator, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
-	tweenservice:Create(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 }):Play()
-	tweenservice:Create(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 }):Play()
+	tweenOrSet(window.top.separator, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 })
+	tweenOrSet(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 })
+	tweenOrSet(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 })
 
 	if window.wallpaper.ison.Value  then
-		tweenservice:Create(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+		tweenOrSet(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 })
 	end
 
 
 	syde:UnbindFrame(window)
 
 
-	tweenservice:Create(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
+	tweenOrSet(window.top.functions, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 })
 	for i,v in pairs(window.top.functions:GetChildren()) do
 		if v:IsA("Frame") then
-			tweenservice:Create(v, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 }):Play()
+			tweenOrSet(v, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1 })
 			v.Visible = false
 			for i,v2 in pairs(v:GetChildren()) do
 				if v2:IsA("ImageLabel") then
-					tweenservice:Create(v2, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+					tweenOrSet(v2, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 })
 					v2.Visible = false
 				end
 			end
@@ -2466,21 +2478,24 @@ function closeui()
 
 	for i, glow in pairs(window.clipframe:GetChildren()) do
 		if glow:IsA("ImageLabel") then
-			tweenservice:Create(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
+			tweenOrSet(glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1})
 		end
 	end
 
-	tweenservice:Create(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
-	tweenservice:Create(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1}):Play()
+	tweenOrSet(window.shadow.glow, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1})
+	tweenOrSet(window.shadow.glow1, TweenInfo.new(0.5, Enum.EasingStyle.Exponential),{ImageTransparency = 1})
 
-	tweenservice:Create(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
-	tweenservice:Create(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 }):Play()
+	tweenOrSet(window.shadow.ImageLabel, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 })
+	tweenOrSet(window.resize, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 })
 
 	closesettings()
 	closesearch()
 	settingsOpen = false
 
 
+	if uiAnimationsEnabled then
+		task.wait(0.4)
+	end
 
 	--task.wait(0.5)
 
@@ -2631,7 +2646,8 @@ local function applyMinihomeInfoTransparency()
 	local targetBg = bluron and 0.78 or nil
 	local targetStroke = bluron and 0.78 or nil
 	local targetImage = bluron and 0.35 or nil
-	local targetText = bluron and 0.12 or nil
+	local targetText = bluron and 0 or nil
+	local blurTextColor = Color3.fromRGB(246, 246, 246)
 
 	local nodes = { Minihome }
 	for _, node in ipairs(Minihome:GetDescendants()) do
@@ -2676,10 +2692,23 @@ local function applyMinihomeInfoTransparency()
 					originalText = node.TextTransparency
 				end
 
-				if targetText then
-					node.TextTransparency = math.max(originalText, targetText)
+				if targetText ~= nil then
+					node.TextTransparency = math.min(originalText, targetText)
 				else
 					node.TextTransparency = originalText
+				end
+
+				local textColorAttr = "__syde_txt_color_original"
+				local originalTextColor = node:GetAttribute(textColorAttr)
+				if originalTextColor == nil then
+					node:SetAttribute(textColorAttr, node.TextColor3)
+					originalTextColor = node.TextColor3
+				end
+
+				if bluron then
+					node.TextColor3 = blurTextColor
+				else
+					node.TextColor3 = originalTextColor
 				end
 			end
 		elseif node:IsA("UIStroke") then
@@ -3509,36 +3538,38 @@ local function applyMinihomeInfoTransparency()
 		window.settings.Visible = true
 		window.dim.Visible = true
 
-		tweenservice:Create(window.settings, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 360,0, 400)}):Play()
-		tweenservice:Create(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.2 }):Play()
-		tweenservice:Create(window.settings.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { CornerRadius = UDim.new(0,20)}):Play()
+		tweenOrSet(window.settings, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 360,0, 400)})
+		tweenOrSet(window.dim, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.2 })
+		tweenOrSet(window.settings.UICorner, TweenInfo.new(0.5, Enum.EasingStyle.Quart), { CornerRadius = UDim.new(0,20)})
 
-		tweenservice:Create(window.settings, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
+		tweenOrSet(window.settings, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0})
 		window.settings.pages.Visible = true
 		window.settings.tabs.Visible = true
 
-		tweenservice:Create(window.settings.top.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0}):Play()
-		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0}):Play()
-		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
+		tweenOrSet(window.settings.top.title, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { TextTransparency = 0})
+		tweenOrSet(window.settings.top.separator, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0})
+		tweenOrSet(window.settings.top.functions.close, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), {
 			BackgroundTransparency = getTopFunctionBaseTransparency()
-		}):Play()
-		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0}):Play()
+		})
+		tweenOrSet(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { ImageTransparency = 0})
 	end
 
 	function closesettings()
-		tweenservice:Create(window.settings, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 360,0, 150)}):Play()
-		tweenservice:Create(window.dim, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-		tweenservice:Create(window.settings.UICorner, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { CornerRadius = UDim.new(0, 90)}):Play()
+		tweenOrSet(window.settings, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { Size = UDim2.new(0, 360,0, 150)})
+		tweenOrSet(window.dim, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1})
+		tweenOrSet(window.settings.UICorner, TweenInfo.new(0.35, Enum.EasingStyle.Quart), { CornerRadius = UDim.new(0, 90)})
 
-		tweenservice:Create(window.settings, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
+		tweenOrSet(window.settings, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1})
 		window.settings.pages.Visible = false
 		window.settings.tabs.Visible = false
 
-		tweenservice:Create(window.settings.top.title, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 1}):Play()
-		tweenservice:Create(window.settings.top.separator, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-		tweenservice:Create(window.settings.top.functions.close, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1}):Play()
-		tweenservice:Create(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { ImageTransparency = 1}):Play()
-		task.wait(0.6)
+		tweenOrSet(window.settings.top.title, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { TextTransparency = 1})
+		tweenOrSet(window.settings.top.separator, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1})
+		tweenOrSet(window.settings.top.functions.close, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { BackgroundTransparency = 1})
+		tweenOrSet(window.settings.top.functions.close.ImageLabel, TweenInfo.new(0.35, Enum.EasingStyle.Exponential), { ImageTransparency = 1})
+		if uiAnimationsEnabled then
+			task.wait(0.6)
+		end
 		window.settings.Visible = false
 		window.dim.Visible = false
 	end
@@ -6354,14 +6385,38 @@ local function applyMinihomeInfoTransparency()
 		})
 
 		a:TextInput({
-			Title = 'Wallpaper ID';
-			NumberOnly = true;
-			PlaceHolder = 'Input your wallpaper ID here.';
+			Title = 'Wallpaper Source';
+			NumberOnly = false;
+			PlaceHolder = 'Use Roblox ID or image URL (https://...)';
 			CallBack = function (v)
-				if v then
-					window.wallpaper.Image = 'rbxassetid://'..v
+				local raw = tostring(v or ""):gsub("^%s*(.-)%s*$", "%1")
+				if raw == "" then
+					return
+				end
+
+				local source = normalizeImageSource(raw)
+				local isUrl = source:match("^https?://") ~= nil
+				local isAsset = source:match("^rbxassetid://") ~= nil
+				if not (isUrl or isAsset) then
+					syde:Toast({
+						Content = 'Invalid source. Use a Roblox ID or full image URL.';
+						Duration = 4;
+					})
+					return
+				end
+
+				local ok = pcall(function()
+					window.wallpaper.Image = source
+				end)
+
+				if ok then
 					syde:Toast({
 						Content = 'Wallpaper applied.'
+					})
+				else
+					syde:Toast({
+						Content = 'Wallpaper could not be applied.';
+						Duration = 4;
 					})
 				end
 			end
@@ -6720,6 +6775,7 @@ local function applyMinihomeInfoTransparency()
 			Value = uiAnimationsEnabled,
 			CallBack = function(v)
 				uiAnimationsEnabled = v
+				syde.UIAnimationsEnabled = v
 				applyAnimationMode()
 				applyTopFunctionBackgrounds(false)
 				applySettingsFunctionBackground(false)
@@ -6949,12 +7005,12 @@ local function applyMinihomeInfoTransparency()
 
 			if isActive then
 				--	tweenservice:Create(HomeButton.text, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0 }):Play()
-				tweenservice:Create(HomeButton.homeicon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 }):Play()
-				tweenservice:Create(HomeButton.homeicon.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0 }):Play()
+				tweenOrSet(HomeButton.homeicon, TweenInfo.new(1, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.45 })
+				tweenOrSet(HomeButton.homeicon.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0 })
 			else
 				--	tweenservice:Create(HomeButton.text, TweenInfo.new(1, Enum.EasingStyle.Exponential), { TextTransparency = 0.67 }):Play()
-				tweenservice:Create(HomeButton.homeicon, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.85 }):Play()
-				tweenservice:Create(HomeButton.homeicon.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.67 }):Play()
+				tweenOrSet(HomeButton.homeicon, TweenInfo.new(0.5, Enum.EasingStyle.Exponential), { BackgroundTransparency = 0.85 })
+				tweenOrSet(HomeButton.homeicon.ImageLabel, TweenInfo.new(1, Enum.EasingStyle.Exponential), { ImageTransparency = 0.67 })
 			end
 		end
 
@@ -6972,9 +7028,11 @@ local function applyMinihomeInfoTransparency()
 				task.spawn(function()
 					for _, v in ipairs(tabs:GetChildren()) do
 						if v:IsA("Frame") then
-							tweenservice:Create(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, v.title.TextBounds.X + 100,0, 30) }):Play()
-							task.wait(0.15)
-							tweenservice:Create(tabButton, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = targetSize }):Play()
+							tweenOrSet(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, v.title.TextBounds.X + 100,0, 30) })
+							if uiAnimationsEnabled then
+								task.wait(0.15)
+							end
+							tweenOrSet(tabButton, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = targetSize })
 							isInit = false
 						end
 					end
@@ -6982,6 +7040,16 @@ local function applyMinihomeInfoTransparency()
 
 			end
 
+			if not uiAnimationsEnabled then
+				tabButton.Size = targetSize
+				tabButton.BackgroundTransparency = targetBackgroundTransparency
+				tabButton.title.TextTransparency = targetTextTransparency
+				tabButton.indicator.glow.ImageColor3 = targetColor
+				tabButton.indicator.glow.ImageTransparency = isSelected and 0.78 or 1
+				tabButton.indicator.BackgroundColor3 = targetColor
+				tabButton.indicator.BackgroundTransparency = isSelected and 0 or 1
+				return
+			end
 
 			tweenservice:Create(tabButton, positionTweenInfo, { Size = targetSize }):Play()
 			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency, }):Play()
