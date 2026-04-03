@@ -4842,11 +4842,14 @@ local function applyMinihomeInfoTransparency()
 
 					table.sort(Keys, function(a,b) return a.Time < b.Time end)
 
-					Keys[1] = ColorSequenceKeypoint.new(0, Keys[2].Value)
-					Keys[4] = ColorSequenceKeypoint.new(1, Keys[3].Value)
+					local leftInnerIndex = (#Keys >= 2) and 2 or 1
+					local rightInnerIndex = (#Keys >= 2) and (#Keys - 1) or #Keys
 
-					data.Color  = Keys[2].Value
-					data.Color2 = Keys[3].Value
+					Keys[1] = ColorSequenceKeypoint.new(0, Keys[leftInnerIndex].Value)
+					Keys[#Keys] = ColorSequenceKeypoint.new(1, Keys[rightInnerIndex].Value)
+
+					data.Color = Keys[leftInnerIndex].Value
+					data.Color2 = Keys[rightInnerIndex].Value
 
 					local seq = ColorSequence.new(Keys)
 					ExternalGradient.Color = seq
@@ -4878,24 +4881,6 @@ local function applyMinihomeInfoTransparency()
 
 					GradientFrame.Pin1.BackgroundColor3 = startCol
 					GradientFrame.Pin2.BackgroundColor3 = endCol
-				end
-
-				local oldCallback = data.CallBack
-				data.CallBack = function(col)
-					if data.Type ~= "Gradient" then
-						if oldCallback then oldCallback(col) end
-						return
-					end
-
-					table.sort(Keys, function(a,b) return a.Time < b.Time end)
-					Keys[1] = ColorSequenceKeypoint.new(0, Keys[1].Value)
-					Keys[#Keys] = ColorSequenceKeypoint.new(1, Keys[#Keys].Value)
-
-					local seq = ColorSequence.new(Keys)
-					ExternalGradient.Color = seq
-					GradientFrame.Gradient.Color = seq
-
-					if oldCallback then oldCallback(seq) end
 				end
 
 				if data.Type == "Gradient" then
@@ -5722,7 +5707,7 @@ local function applyMinihomeInfoTransparency()
 
 						if OptionText == data.StarterOption and not starterSet then
 							starterSet = true
-							dropdown.dropholder.drop.Selected.Text = OptionText
+							dropdown.dropholder.drop.selected.Text = OptionText
 							SelectedOptions = {[OptionText] = true}
 							SelectedOrder = {OptionText}
 
@@ -9688,7 +9673,7 @@ local function applyMinihomeInfoTransparency()
 
 					if OptionText == data.StarterOption and not starterSet then
 						starterSet = true
-						dropdown.dropholder.drop.Selected.Text = OptionText
+						dropdown.dropholder.drop.selected.Text = OptionText
 						SelectedOptions = {[OptionText] = true}
 						SelectedOrder = {OptionText}
 
@@ -10053,11 +10038,14 @@ local function applyMinihomeInfoTransparency()
 
 				table.sort(Keys, function(a,b) return a.Time < b.Time end)
 
-				Keys[1] = ColorSequenceKeypoint.new(0, Keys[2].Value)
-				Keys[4] = ColorSequenceKeypoint.new(1, Keys[3].Value)
+				local leftInnerIndex = (#Keys >= 2) and 2 or 1
+				local rightInnerIndex = (#Keys >= 2) and (#Keys - 1) or #Keys
 
-				data.Color  = Keys[2].Value
-				data.Color2 = Keys[3].Value
+				Keys[1] = ColorSequenceKeypoint.new(0, Keys[leftInnerIndex].Value)
+				Keys[#Keys] = ColorSequenceKeypoint.new(1, Keys[rightInnerIndex].Value)
+
+				data.Color = Keys[leftInnerIndex].Value
+				data.Color2 = Keys[rightInnerIndex].Value
 
 				local seq = ColorSequence.new(Keys)
 				ExternalGradient.Color = seq
@@ -10089,24 +10077,6 @@ local function applyMinihomeInfoTransparency()
 
 				GradientFrame.Pin1.BackgroundColor3 = startCol
 				GradientFrame.Pin2.BackgroundColor3 = endCol
-			end
-
-			local oldCallback = data.CallBack
-			data.CallBack = function(col)
-				if data.Type ~= "Gradient" then
-					if oldCallback then oldCallback(col) end
-					return
-				end
-
-				table.sort(Keys, function(a,b) return a.Time < b.Time end)
-				Keys[1] = ColorSequenceKeypoint.new(0, Keys[1].Value)
-				Keys[#Keys] = ColorSequenceKeypoint.new(1, Keys[#Keys].Value)
-
-				local seq = ColorSequence.new(Keys)
-				ExternalGradient.Color = seq
-				GradientFrame.Gradient.Color = seq
-
-				if oldCallback then oldCallback(seq) end
 			end
 
 			if data.Type == "Gradient" then
