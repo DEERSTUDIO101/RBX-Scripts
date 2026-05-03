@@ -2877,6 +2877,7 @@ function syde:ToggleUserMenu()
 			local btn = Instance.new("TextButton")
 			btn.Name = name
 			btn.Parent = userMenuFrame
+			btn.ZIndex = userMenuFrame.ZIndex + 1
 			btn.Size = UDim2.new(0.9, 0, 0, 30)
 			btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
 			btn.Text = name
