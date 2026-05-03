@@ -250,6 +250,10 @@ function syde:dprint(...)
 	return self:DebugPrint(...)
 end
 
+function syde:IsDebugEnabled()
+	return self.DebugEnabled == true
+end
+
 function syde:_Debug(tag, message, ...)
 	if not self.DebugEnabled then
 		return
@@ -1919,10 +1923,22 @@ end
 
 --@UiSetup
 local ui = Library
-local window = ui.main
-local top = window.top
-local tabs = window.tabs.tab
-local pages = window.pages
+local window = ui:FindFirstChild("main")
+local top = window and window:FindFirstChild("top")
+
+-- Robust member lookup to handle structural variations
+local function getMember(parent, name)
+	if not parent then return nil end
+	return parent:FindFirstChild(name) or parent:FindFirstChild(name, true)
+end
+
+local tabs_container = getMember(window, "tabs")
+local tabs = getMember(tabs_container, "tab")
+local pages = getMember(window, "pages")
+
+if not window then
+	warn("[SYDE] Critical Error: Main window frame not found in Library asset.")
+end
 
 --
 
@@ -2926,7 +2942,7 @@ function openui()
 		BackgroundTransparency = getTopFunctionsContainerTransparency()
 	})
 
-	if window.wallpaper.ison.Value  then
+	if window and window:FindFirstChild("wallpaper") and window.wallpaper:FindFirstChild("ison") and window.wallpaper.ison.Value then
 		tweenOrSet(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 0.84 })
 	end
 
@@ -2981,7 +2997,7 @@ function closeui()
 	tweenOrSet(window.top.title, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 })
 	tweenOrSet(window.top.title.sub, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {TextTransparency = 1 })
 
-	if window.wallpaper.ison.Value  then
+	if window and window:FindFirstChild("wallpaper") and window.wallpaper:FindFirstChild("ison") and window.wallpaper.ison.Value then
 		tweenOrSet(window.wallpaper, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {ImageTransparency = 1 })
 	end
 
@@ -6938,32 +6954,24 @@ local function applyMinihomeInfoTransparency()
 		a:Toggle({
 			Title = 'Wallpaper';
 			Description = 'Displays personalized wallpaper';
-			Value = window.wallpaper.ison.Value,
+			Value = (window and window:FindFirstChild("wallpaper") and window.wallpaper:FindFirstChild("ison") and window.wallpaper.ison.Value) or false,
 			CallBack = function (v)
-				if v then
-					window.wallpaper.Visible = true
-					window.pages.clipframe.v0.Visible = false
-					window.pages.clipframe.v1.Visible = false
-
-					window.pages.v0.Visible = false
-					window.pages.v1.Visible = false
-					window.wallpaper.ison.Value = true
-				else
-					window.wallpaper.Visible = false
-
-					window.wallpaper.ison.Value = false
-
-					if bluron then
-						window.pages.clipframe.v0.Visible = false
-						window.pages.clipframe.v1.Visible = false
-						window.pages.v0.Visible = false
-						window.pages.v1.Visible = false
-					else
-						window.pages.clipframe.v0.Visible = true
-						window.pages.clipframe.v1.Visible = true
-
-						window.pages.v0.Visible = true
-						window.pages.v1.Visible = true
+				if window and window:FindFirstChild("wallpaper") then
+					window.wallpaper.Visible = v
+					if window.wallpaper:FindFirstChild("ison") then
+						window.wallpaper.ison.Value = v
+					end
+					
+					-- Safety check for clipframe and nested pages
+					local clip = pages and pages:FindFirstChild("clipframe")
+					if clip then
+						if clip:FindFirstChild("v0") then clip.v0.Visible = not v end
+						if clip:FindFirstChild("v1") then clip.v1.Visible = not v end
+					end
+					
+					if pages then
+						if pages:FindFirstChild("v0") then pages.v0.Visible = not v end
+						if pages:FindFirstChild("v1") then pages.v1.Visible = not v end
 					end
 				end
 			end,
@@ -7873,9 +7881,19 @@ local function applyMinihomeInfoTransparency()
 		local LockedFrames = {}
 
 		--[Tab Setup]
-		local Tab = tabs.btn:Clone()
+		if not tabs then
+			warn("[SYDE] Error: 'tabs' member is missing. Tab creation failed for: " .. tostring(tdata.Title))
+			return {}
+		end
+
+		local Tab = tabs:FindFirstChild("btn") and tabs.btn:Clone()
+		if not Tab then
+			warn("[SYDE] Error: 'tabs.btn' template is missing. Tab creation failed for: " .. tostring(tdata.Title))
+			return {}
+		end
+
 		Tab.Visible = true
-		Tab.Parent = tabs
+		Tab.Parent = tabs_container or tabs.Parent or window
 		Tab.title.Text = tdata.Title
 		Tab.Name = tdata.Title
 
