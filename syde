@@ -7,10 +7,17 @@ local isfile = rawget(_G, 'isfile')
 local isfolder = rawget(_G, 'isfolder')
 local makefolder = rawget(_G, 'makefolder')
 local listfiles = rawget(_G, 'listfiles')
+local read_file = rawget(_G, 'read_file')
+local write_file = rawget(_G, 'write_file')
+local is_file = rawget(_G, 'is_file')
+local is_folder = rawget(_G, 'is_folder')
+local make_folder = rawget(_G, 'make_folder')
+local list_files = rawget(_G, 'list_files')
 local setclipboard = rawget(_G, 'setclipboard')
 local syn = rawget(_G, 'syn')
 local request = rawget(_G, 'request')
 local http_request = rawget(_G, 'http_request')
+local httprequest = rawget(_G, 'httprequest')
 local http = rawget(_G, 'http')
 local getsynasset = rawget(_G, 'getsynasset')
 local getcustomasset = rawget(_G, 'getcustomasset')
@@ -24,6 +31,38 @@ if type(getgenv) == 'function' then
 		__sydeEnv = env
 	end
 end
+
+local function resolveGlobal(name)
+	local value = rawget(_G, name)
+	if value ~= nil then
+		return value
+	end
+	if type(__sydeEnv) == "table" then
+		return rawget(__sydeEnv, name) or __sydeEnv[name]
+	end
+	return nil
+end
+
+readfile = readfile or resolveGlobal('readfile')
+writefile = writefile or resolveGlobal('writefile')
+isfile = isfile or resolveGlobal('isfile')
+isfolder = isfolder or resolveGlobal('isfolder')
+makefolder = makefolder or resolveGlobal('makefolder')
+listfiles = listfiles or resolveGlobal('listfiles')
+readfile = readfile or read_file or resolveGlobal('read_file')
+writefile = writefile or write_file or resolveGlobal('write_file')
+isfile = isfile or is_file or resolveGlobal('is_file')
+isfolder = isfolder or is_folder or resolveGlobal('is_folder')
+makefolder = makefolder or make_folder or resolveGlobal('make_folder')
+listfiles = listfiles or list_files or resolveGlobal('list_files')
+setclipboard = setclipboard or resolveGlobal('setclipboard')
+syn = syn or resolveGlobal('syn')
+request = request or resolveGlobal('request')
+http_request = http_request or resolveGlobal('http_request')
+httprequest = httprequest or resolveGlobal('httprequest')
+http = http or resolveGlobal('http')
+getsynasset = getsynasset or resolveGlobal('getsynasset')
+getcustomasset = getcustomasset or resolveGlobal('getcustomasset')
 
 if not __sydeEnv.__SYDE_LOCAL_SOURCE_REDIRECTING then
 	local compiler = nil
@@ -51,15 +90,13 @@ if not __sydeEnv.__SYDE_LOCAL_SOURCE_REDIRECTING then
 	end
 end
 
-local inputservice =	game:GetService("InsertService")
+local inputservice =	game:GetService("UserInputService") -- Bug Fix: war fälschlicherweise InsertService
 local tweenservice = 	game:GetService("TweenService")
 local https = 			game:GetService("HttpService")
 local runservice =		game:GetService("RunService")
 local userinput =		game:GetService("UserInputService")
-local players =         game:GetService("Players"):GetPlayers()
-local textservice =     game:GetService('TextService')
-local player =          game:GetService('Players')
-local textservice =     game:GetService('TextService')
+local player =          game:GetService('Players') -- Bug Fix: war :GetPlayers() (liefert Array, nicht Service)
+local textservice =     game:GetService('TextService') -- Bug Fix: doppelte Deklaration entfernt
 local coregui =         game:GetService("CoreGui")
 
 -- update check
@@ -153,6 +190,10 @@ Library.Enabled = false
 Loader.Enabled = false
 
 local loaded = false
+local __sydeInitialDebugEnabled = false
+if __sydeEnv then
+	__sydeInitialDebugEnabled = (__sydeEnv.__SYDE_DEBUG_ENABLED == true) or (__sydeEnv["syde-debug"] == true)
+end
 
 local syde = {
 
@@ -173,7 +214,7 @@ local syde = {
 	Flags = {};
 	SettingsFlags = {};
 	UIAnimationsEnabled = true;
-	DebugEnabled = __sydeEnv and __sydeEnv.__SYDE_DEBUG_ENABLED == true or false;
+	DebugEnabled = __sydeInitialDebugEnabled;
 	DebugPrefix = "SYDE-DEBUG";
 };
 
@@ -183,12 +224,30 @@ function syde:SetDebug(enabled)
 	self.DebugEnabled = enabled == true
 	if __sydeEnv then
 		__sydeEnv.__SYDE_DEBUG_ENABLED = self.DebugEnabled
+		__sydeEnv["syde-debug"] = self.DebugEnabled
 	end
 	print(("[SYDE] Debug prints %s"):format(self.DebugEnabled and "enabled" or "disabled"))
 end
 
 function syde:IsDebugEnabled()
 	return self.DebugEnabled == true
+end
+
+function syde:DebugPrint(...)
+	if not self.DebugEnabled then
+		return
+	end
+
+	local parts = table.create(select("#", ...))
+	for i = 1, select("#", ...) do
+		parts[i] = tostring(select(i, ...))
+	end
+	print(("[%s] %s"):format(self.DebugPrefix, table.concat(parts, " ")))
+end
+
+-- Convenience alias for scripts that prefer dprint-style naming.
+function syde:dprint(...)
+	return self:DebugPrint(...)
 end
 
 function syde:_Debug(tag, message, ...)
@@ -265,7 +324,7 @@ do
 	end
 	local continue = IsNotNaN(camera:ScreenPointToRay(0,0).Origin.x)
 	while not continue do
-		RunService.RenderStepped:wait()
+		RunService.RenderStepped:Wait() -- Bug Fix: :wait() deprecated, :Wait() verwenden
 		continue = IsNotNaN(camera:ScreenPointToRay(0,0).Origin.x)
 	end
 end
@@ -1299,6 +1358,18 @@ do
 
 	function syde:Load(Config)
 		Config = Config or {}
+		local debugSetting = Config.Debug_s
+		if debugSetting == nil then
+			debugSetting = Config.Debug
+		end
+		if debugSetting ~= nil then
+			if type(debugSetting) == "string" then
+				local normalized = string.lower(debugSetting)
+				self:SetDebug(normalized == "true" or normalized == "1" or normalized == "yes" or normalized == "on")
+			else
+				self:SetDebug(debugSetting == true)
+			end
+		end
 		self:_Debug("Load", "syde:Load called (Name=%s, Status=%s)", tostring(Config.Name or "nil"), tostring(Config.Status or "nil"))
 		task.wait(1)
 		self:_Debug("Load", "Loader assets mounted")
@@ -1481,7 +1552,7 @@ do
 					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
 				end
 
-				setclipboard(value)
+				if setclipboard then setclipboard(value) end -- Bug Fix: nil-Check für setclipboard hinzugefügt
 			end)
 
 			clone.MouseEnter:Connect(function()
@@ -2442,16 +2513,28 @@ function syde:Modal(Modal)
 			ConfirmCallBack = Modal.ConfirmCallBack or Modal.ConfimCallBack
 		}
 
-		local ModalInstance = ui.main.modal:Clone()
-		ModalInstance.Visible = true
-		ModalInstance.Parent = ui.main
-		ModalInstance.Title.Text = ModalData.Title
-		ModalInstance.Content.Text = ModalData.Content
-		--	ModalInstance.Content.Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
-		ModalInstance.Size = UDim2.new(0, 350,0, 144)
-		ModalInstance.BackgroundTransparency = 1
-		ModalInstance.Title.TextTransparency = 1
-		ModalInstance.Content.TextTransparency = 1
+			local ModalInstance = ui.main.modal:Clone()
+			ModalInstance.Visible = true
+			ModalInstance.Parent = ui.main
+			local ModalTitle = ModalInstance:FindFirstChild("Title")
+			local ModalContent = ModalInstance:FindFirstChild("Content")
+			local ModalStroke = ModalInstance:FindFirstChildOfClass("UIStroke")
+
+			if ModalTitle and ModalTitle:IsA("TextLabel") then
+				ModalTitle.Text = ModalData.Title
+			end
+			if ModalContent and ModalContent:IsA("TextLabel") then
+				ModalContent.Text = ModalData.Content
+			end
+			--	ModalInstance.Content.Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)
+			ModalInstance.Size = UDim2.new(0, 350,0, 144)
+			ModalInstance.BackgroundTransparency = 1
+			if ModalTitle and ModalTitle:IsA("TextLabel") then
+				ModalTitle.TextTransparency = 1
+			end
+			if ModalContent and ModalContent:IsA("TextLabel") then
+				ModalContent.TextTransparency = 1
+			end
 
 		local ButtonsFrame = ModalInstance:FindFirstChild("Buttons")
 		local ConfirmButton = ButtonsFrame and ButtonsFrame:FindFirstChild("Confirm")
@@ -2477,16 +2560,26 @@ function syde:Modal(Modal)
 			CancelStroke.Transparency = 1
 		end
 
-		local function openModal()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalInstance.Content.Size.X.Offset, 1, ModalInstance.Content.TextBounds.Y)}):Play()
-			activeModals += 1
-			--	ModalInstance.Size = UDim2.new(0, ModalInstance.Size.X.Offset, 0, ModalInstance.Content.TextBounds.Y + 120)
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0,  ModalInstance.Content.TextBounds.Y + 150)}):Play()
+			local function openModal()
+				local contentHeight = 0
+				if ModalContent and ModalContent:IsA("TextLabel") then
+					contentHeight = ModalContent.TextBounds.Y
+					tweenservice:Create(ModalContent, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(1, ModalContent.Size.X.Offset, 1, contentHeight)}):Play()
+				end
+				activeModals += 1
+				--	ModalInstance.Size = UDim2.new(0, ModalInstance.Size.X.Offset, 0, ModalInstance.Content.TextBounds.Y + 120)
+				tweenservice:Create(ModalInstance, TweenInfo.new(0.65, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0,  contentHeight + 150)}):Play()
 
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Title, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+				tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0}):Play()
+				if ModalStroke then
+					tweenservice:Create(ModalStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+				end
+				if ModalTitle and ModalTitle:IsA("TextLabel") then
+					tweenservice:Create(ModalTitle, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+				end
+				if ModalContent and ModalContent:IsA("TextLabel") then
+					tweenservice:Create(ModalContent, TweenInfo.new(1, Enum.EasingStyle.Exponential), {TextTransparency = 0}):Play()
+				end
 
 			if ConfirmButton then
 				tweenservice:Create(ConfirmButton, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 0.5}):Play()
@@ -2508,10 +2601,21 @@ function syde:Modal(Modal)
 		end
 		openModal()
 
-		local function closeModal()
-			activeModals = math.max(activeModals - 1, 0)
-			if CancelButton then
-				pcall(function()
+			local modalClosing = false
+			local function closeModal()
+				if modalClosing then
+					return
+				end
+				modalClosing = true
+
+				if not ModalInstance or not ModalInstance.Parent then
+					activeModals = math.max(activeModals - 1, 0)
+					return
+				end
+
+				activeModals = math.max(activeModals - 1, 0)
+				if CancelButton then
+					pcall(function()
 					CancelButton.Interactable = false
 				end)
 			end
@@ -2519,12 +2623,18 @@ function syde:Modal(Modal)
 				pcall(function()
 					ConfirmButton.Interactable = false
 				end)
-			end
-			tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
-			tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Title, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-			tweenservice:Create(ModalInstance.UIStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-			tweenservice:Create(ModalInstance.Content, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+				end
+				tweenservice:Create(ModalInstance, TweenInfo.new(0.75, Enum.EasingStyle.Quint), {Size = UDim2.new(0, 350,0, 147)}):Play()
+				tweenservice:Create(ModalInstance, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
+				if ModalTitle and ModalTitle.Parent then
+					tweenservice:Create(ModalTitle, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+				end
+				if ModalStroke and ModalStroke.Parent then
+					tweenservice:Create(ModalStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+				end
+				if ModalContent and ModalContent.Parent then
+					tweenservice:Create(ModalContent, TweenInfo.new(0.3, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
+				end
 
 			if ConfirmButton then
 				tweenservice:Create(ConfirmButton, TweenInfo.new(1, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
@@ -2542,26 +2652,48 @@ function syde:Modal(Modal)
 			if CancelStroke then
 				tweenservice:Create(CancelStroke, TweenInfo.new(1, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
 			end
-			task.wait(0.45)
-			ModalInstance:Destroy()
-		end
-
-		local function hideDimIfNoModals()
-			if activeModals == 0 then
-				tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
-					BackgroundTransparency = 1
-				}):Play()
-				task.wait(0.7)
-				ui.main.dim.Visible = false
+				task.wait(0.45)
+				if ModalInstance and ModalInstance.Parent then
+					ModalInstance:Destroy()
+				end
 			end
-		end
 
-		if activeModals == 1 then
-			ui.main.dim.Visible = true
-			tweenservice:Create(ui.main.dim, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
-				BackgroundTransparency = 0.3
-			}):Play()
-		end
+			local function getDimFrame()
+				if not ui then
+					return nil
+				end
+				local mainFrame = ui:FindFirstChild("main")
+				if not mainFrame then
+					return nil
+				end
+				return mainFrame:FindFirstChild("dim")
+			end
+
+			local function hideDimIfNoModals()
+				if activeModals == 0 then
+					local dimFrame = getDimFrame()
+					if not dimFrame then
+						return
+					end
+					tweenservice:Create(dimFrame, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+						BackgroundTransparency = 1
+					}):Play()
+					task.wait(0.7)
+					if dimFrame and dimFrame.Parent then
+						dimFrame.Visible = false
+					end
+				end
+			end
+
+			if activeModals == 1 then
+				local dimFrame = getDimFrame()
+				if dimFrame then
+					dimFrame.Visible = true
+					tweenservice:Create(dimFrame, TweenInfo.new(0.73, Enum.EasingStyle.Exponential), {
+						BackgroundTransparency = 0.3
+					}):Play()
+				end
+			end
 
 		if ConfirmButton and ConfirmButton:IsA("GuiButton") then
 			ConfirmButton.MouseButton1Click:Connect(function()
@@ -2905,30 +3037,27 @@ function closeui()
 end
 
 local bounce = false
+local layoutConnectionsSetup = false -- Bug Fix: Guard für einmalige Event-Registrierung
 
 function ToggleUI()
 	if bounce then return end
 	bounce = true
 
-	if uiclosed then
-		--	task.wait(0.2)
-		print('open')
-		openui()
-
-		workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-			screenSize = workspace.CurrentCamera.ViewportSize
-			isMobile = userinput.TouchEnabled
-			updateLayout()
-		end)
-
-		updateLayout()
-
+	if not layoutConnectionsSetup then
+		layoutConnectionsSetup = true
 		camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateLayout)
 		userinput:GetPropertyChangedSignal("TouchEnabled"):Connect(updateLayout)
+	end
+
+	if uiclosed then
+		print('open')
+		openui()
+		updateLayout()
 	else
 		closeui()
 		print('close')
 	end
+	-- Bug Fix: ViewportSize/TouchEnabled Connections werden nur einmalig registriert (nicht bei jedem openui-Aufruf)
 
 	task.delay(0.2, function()
 		bounce = false
@@ -3719,7 +3848,7 @@ local function applyMinihomeInfoTransparency()
 
 
 		task.spawn(function()
-			while true do
+			while graph and graph.Parent do -- Bug Fix: Loop endet wenn UI zerstört wird
 
 				local ping = getPing()
 				-- replace with getPing() when ready
@@ -4720,7 +4849,7 @@ local function applyMinihomeInfoTransparency()
 					SFlag = ColorPicker.SFlag;
 				}
 
-				ColorPicker.Linkable = ColorPicker.Linkable or true
+				ColorPicker.Linkable = (ColorPicker.Linkable ~= false) -- Bug Fix: 'or true' wuerde immer true setzen; stattdessen nur false behandeln
 
 				local colorpicker = window.settings.pages.page.ColorPicker:Clone()
 				colorpicker.Visible = true
@@ -5004,7 +5133,9 @@ local function applyMinihomeInfoTransparency()
 					data.Color2 = Keys[rightInnerIndex].Value
 
 					local seq = ColorSequence.new(Keys)
-					ExternalGradient.Color = seq
+					if ExternalGradient then -- Bug Fix: nil-Check bevor .Color gesetzt wird
+						ExternalGradient.Color = seq
+					end
 					GradientFrame.Gradient.Color = seq
 
 					if oldCallback then
@@ -5444,9 +5575,10 @@ local function applyMinihomeInfoTransparency()
 					end
 				end)
 
-				local UserInputService = game:GetService("UserInputService")
-				local TweenService = game:GetService("TweenService")
-				local RunService = game:GetService("RunService")
+				-- Bug Fix: Lokale Service-Aliase entfernt; globale Variablen userinput/tweenservice/runservice verwenden
+				local UserInputService = userinput
+				local TweenService = tweenservice
+				local RunService = runservice
 
 				local linkDragging = false
 				local originalPosition = UDim2.new(0.5, 0,0, 0)
@@ -5487,7 +5619,7 @@ local function applyMinihomeInfoTransparency()
 					end)
 				end)
 
-				UserInputService.InputEnded:Connect(function(input)
+				syde:AddConnection(UserInputService.InputEnded, function(input) -- Bug Fix: syde:AddConnection statt direktem Connect (Cleanup-Management)
 					if input.UserInputType == Enum.UserInputType.MouseButton1 and linkDragging then
 						linkDragging = false
 						local foundTarget = false
@@ -5592,7 +5724,7 @@ local function applyMinihomeInfoTransparency()
 					end
 				end
 
-				colorpicker.color.Values.Rainbow.MouseButton1Click:Connect(ToggleRainbowEffect)
+				-- Bug Fix: Doppelte Verbindung entfernt (war bereits auf Zeile 5698 verbunden)
 
 				return data
 
@@ -5984,7 +6116,14 @@ local function applyMinihomeInfoTransparency()
 
 					syde:replayLoadTweens(Slider.slide.slideframe)
 
-					local decimalPlaces = tostring(Options.Increment):match("%.([^0]*)") and #tostring(Options.Increment):match("%.([^0]*)") or 0
+					-- Bug Fix: Korrekte Dezimalstellen-Erkennung, auch für Werte wie 0.10
+					local function getDecimalPlaces(n)
+						local s = tostring(n)
+						local dot = s:find("%.", 1, true)
+						if not dot then return 0 end
+						return #s - dot
+					end
+					local decimalPlaces = getDecimalPlaces(Options.Increment)
 					Slider.v.Text = string.format("<font size='14'>%." .. decimalPlaces .. "f</font><font color='#434343'>/%." .. decimalPlaces .. "f</font>", Options.StarterValue, Options.Range[2])
 
 					local function BuildTicks(slide, options)
@@ -6134,7 +6273,8 @@ local function applyMinihomeInfoTransparency()
 					end)
 
 					syde:AddConnection(userinput.InputChanged, function(input)
-						if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  or input.UserInputType == Enum.UserInputType.Touch  then
+						-- Bug Fix: Klammern hinzugefügt, damit 'dragging' korrekt für beide Input-Typen gilt
+						if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 							UpdateSlider(input.Position.X)
 						end
 					end)
@@ -6143,9 +6283,12 @@ local function applyMinihomeInfoTransparency()
 					Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = syde.theme.HitBox
 					Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = syde.theme.HitBox
 					Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = syde.theme.HitBox
-					slider.slideholder.Size = UDim2.new(1,-30,0,slider.slideholder.UIListLayout.AbsoluteContentSize.Y)
-					local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
-					slider.Size = UDim2.new(1,-35,0, ss  + 20)
+					-- Bug Fix: task.defer() damit AbsoluteContentSize nach dem Render-Cycle aktuell ist
+					task.defer(function()
+						slider.slideholder.Size = UDim2.new(1,-30,0,slider.slideholder.UIListLayout.AbsoluteContentSize.Y)
+						local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
+						slider.Size = UDim2.new(1,-35,0, ss + 20)
+					end)
 
 					syde:AddConnection(syde.Comms.Event, function(p, color)
 						if p == 'HitBox' then
@@ -6212,10 +6355,9 @@ local function applyMinihomeInfoTransparency()
 						Options.StarterValue = NewVal
 					end
 
+					-- Bug Fix: Redundantes doppeltes if entfernt
 					if Options.SFlag then
-						if Options.SFlag then
-							syde.SettingsFlags[Options.SFlag] = Options
-						end
+						syde.SettingsFlags[Options.SFlag] = Options
 					end
 
 				end
@@ -6924,7 +7066,11 @@ local function applyMinihomeInfoTransparency()
 
 		local function verifyDiscord(id)
 			-- Try Roblox GetAsync first
-			if HttpService.HttpEnabled then
+			-- Bug Fix: HttpService.HttpEnabled existiert nicht als Property; pcall verwenden
+			local httpOk = pcall(function()
+				return HttpService:GetAsync("https://www.roblox.com", true) -- test-call
+			end)
+			if httpOk then
 				local ok, res = pcall(function()
 					return HttpService:GetAsync(VERIFY_ENDPOINT .. id, true)
 				end)
@@ -7657,8 +7803,6 @@ local function applyMinihomeInfoTransparency()
 		})
 
 
-		local startTime = tick()
-
 		local uptimeParagraph = c:Paragraph({
 			Title = 'Session UpTime',
 			Content = 'Calculating...'
@@ -7671,7 +7815,6 @@ local function applyMinihomeInfoTransparency()
 			seconds = seconds % 3600
 			local minutes = math.floor(seconds / 60)
 			seconds = math.floor(seconds % 60)
-
 			return string.format("%02d:%02d:%02d:%02d", days, hours, minutes, seconds)
 		end
 
@@ -7686,16 +7829,9 @@ local function applyMinihomeInfoTransparency()
 	end
 
 
-	workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(function()
-		screenSize = workspace.CurrentCamera.ViewportSize
-		isMobile = userinput.TouchEnabled
-		updateLayout()
-	end)
-
+	-- Bug Fix: Layout-Connections bereits in layoutConnectionsSetup (ToggleUI) registriert
+	-- Hier nur updateLayout einmalig aufrufen, keine weiteren Event-Connections
 	updateLayout()
-
-	camera:GetPropertyChangedSignal("ViewportSize"):Connect(updateLayout)
-	userinput:GetPropertyChangedSignal("TouchEnabled"):Connect(updateLayout)
 
 	--@@Tabs
 	local tbdata = {
@@ -8711,7 +8847,7 @@ local function applyMinihomeInfoTransparency()
 					end)
 				end)
 
-				userinput.InputBegan:Connect(function(input, processed)
+				syde:AddConnection(userinput.InputBegan, function(input, processed) -- Bug Fix: syde:AddConnection statt :Connect (Cleanup-Management)
 					if not processed and data.Keybind and data.KeybindReady and input.KeyCode == data.Keybind then
 						data.V = not data.V
 						UpdateToggleUI(data.V)
@@ -9009,7 +9145,7 @@ local function applyMinihomeInfoTransparency()
 
 					end
 				end
-				UpdateSlider()
+				-- Bug Fix: UpdateSlider() ohne Argument entfernt (dragging=false, hätte nichts getan)
 
 				Slider.slide.Interact.MouseButton1Down:Connect(function()
 					dragging = true
@@ -9030,7 +9166,8 @@ local function applyMinihomeInfoTransparency()
 				end)
 
 				syde:AddConnection(userinput.InputChanged, function(input)
-					if dragging and input.UserInputType == Enum.UserInputType.MouseMovement  or input.UserInputType == Enum.UserInputType.Touch  then
+					-- Bug Fix: Klammern für korrekte Operator-Präzedenz
+					if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
 						UpdateSlider(input.Position.X)
 					end
 				end)
@@ -9039,9 +9176,12 @@ local function applyMinihomeInfoTransparency()
 				Slider.slide.slideframe.shadowHolder.ambientShadow.ImageColor3 = syde.theme.HitBox
 				Slider.slide.slideframe.shadowHolder.penumbraShadow.ImageColor3 = syde.theme.HitBox
 				Slider.slide.slideframe.shadowHolder.umbraShadow.ImageColor3 = syde.theme.HitBox
-				slider.slideholder.Size = UDim2.new(1,-30,0,slider.slideholder.UIListLayout.AbsoluteContentSize.Y)
-				local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
-				slider.Size = UDim2.new(1,-35,0, ss  + 20)
+				-- Bug Fix: task.defer() damit AbsoluteContentSize nach dem Render-Cycle aktuell ist
+				task.defer(function()
+					slider.slideholder.Size = UDim2.new(1,-30,0,slider.slideholder.UIListLayout.AbsoluteContentSize.Y)
+					local ss = slider.slideholder.UIListLayout.AbsoluteContentSize.Y
+					slider.Size = UDim2.new(1,-35,0, ss + 20)
+				end)
 
 				syde:AddConnection(syde.Comms.Event, function(p, color)
 					if p == 'HitBox' then
@@ -9073,7 +9213,8 @@ local function applyMinihomeInfoTransparency()
 					) 
 
 					-- Update value display
-					Slider.v.Text = string.format("<font size='14'>%d</font><font color='#434343'>/%d</font>", tostring(NewVal), Options.Range[2])
+					-- Bug Fix: tostring() entfernt, %d erwartet eine Zahl, nicht einen String
+					Slider.v.Text = string.format("<font size='14'>%d</font><font color='#434343'>/%d</font>", NewVal, Options.Range[2])
 
 					-- Tween title appearance
 					local titleLabel = getSliderTitleLabel(Slider)
@@ -9200,18 +9341,388 @@ local function applyMinihomeInfoTransparency()
 			return self:Img(ImageData)
 		end
 
-		function initelement:Rate(RateData)
-			syde:_Debug("Element", "Rate created (Title=%s)", tostring(RateData and RateData.Title or "Rating"))
-			local data = {
-				Title = (RateData and RateData.Title) or "Rating";
-				WebHook = (RateData and RateData.WebHook) or "";
-			}
+			function initelement:Rate(RateData)
+				syde:_Debug("Element", "Rate created (Title=%s)", tostring(RateData and RateData.Title or "Rating"))
+				local data = {
+					Title = (RateData and RateData.Title) or "Rating";
+					WebHook = (RateData and RateData.WebHook) or "";
+					Default = (RateData and tonumber(RateData.Default)) or 0;
+					Decimals = (RateData and tonumber(RateData.Decimals)) or 1;
+					AllowWebhookOption = (RateData and RateData.AllowWebhookOption) ~= false;
+					SendWebhookDefault = (RateData and RateData.SendWebhookDefault) == true;
+				}
 
-			return self:Paragraph({
-				Title = data.Title,
-				Content = "Rate component is not configured in this build.\nWebhook: " .. tostring(data.WebHook)
-			})
-		end
+				local function clampRating(value)
+					local n = tonumber(value)
+					if not n then
+						return nil
+					end
+					n = math.clamp(n, 0, 5)
+					local pow = 10 ^ math.max(0, math.floor(data.Decimals))
+					return math.floor((n * pow) + 0.5) / pow
+				end
+
+				local function parseRatingText(text)
+					if type(text) ~= "string" then
+						return nil
+					end
+					local normalized = text:gsub(",", "."):gsub("%s+", "")
+					return clampRating(normalized)
+				end
+
+				local function getRequestFunction()
+					if type(request) == "function" then
+						return request
+					end
+					if type(http_request) == "function" then
+						return http_request
+					end
+					if type(httprequest) == "function" then
+						return httprequest
+					end
+					if type(syn) == "table" and type(syn.request) == "function" then
+						return syn.request
+					end
+					if type(http) == "table" and type(http.request) == "function" then
+						return http.request
+					end
+					if type(https) == "Instance" and type(https.RequestAsync) == "function" then
+						return function(args)
+							return https:RequestAsync({
+								Url = args.Url or args.url,
+								Method = args.Method or args.method or "POST",
+								Headers = args.Headers or args.headers or {},
+								Body = args.Body or args.body or "",
+							})
+						end
+					end
+					if type(__sydeEnv) == "table" then
+						if type(__sydeEnv.request) == "function" then
+							return __sydeEnv.request
+							end
+							if type(__sydeEnv.http_request) == "function" then
+								return __sydeEnv.http_request
+							end
+							if type(__sydeEnv.httprequest) == "function" then
+								return __sydeEnv.httprequest
+							end
+						end
+						return nil
+					end
+
+				local function formatRating(value)
+					return string.format("%." .. tostring(math.max(0, math.floor(data.Decimals))) .. "f", value)
+				end
+
+				local container = Instance.new("Frame")
+				container.Name = data.Title
+				container.BackgroundColor3 = Color3.fromRGB(17, 17, 17)
+				container.BackgroundTransparency = getBasicButtonTransparency()
+				container.Size = UDim2.new(1, -35, 0, 180)
+				container.Parent = Page
+				container:SetAttribute("Searchable", true)
+
+				local corner = Instance.new("UICorner")
+				corner.CornerRadius = UDim.new(0, 20)
+				corner.Parent = container
+
+				local title = Instance.new("TextLabel")
+				title.Name = "title"
+				title.BackgroundTransparency = 1
+				title.Font = Enum.Font.GothamMedium
+				title.TextSize = 14
+				title.TextColor3 = Color3.fromRGB(230, 230, 230)
+				title.TextXAlignment = Enum.TextXAlignment.Left
+				title.Text = data.Title
+				title.Size = UDim2.new(1, -20, 0, 24)
+				title.Position = UDim2.new(0, 10, 0, 8)
+				title.Parent = container
+
+				local starsRow = Instance.new("Frame")
+				starsRow.Name = "StarsRow"
+				starsRow.BackgroundTransparency = 1
+				starsRow.Size = UDim2.new(1, -20, 0, 42)
+				starsRow.Position = UDim2.new(0, 10, 0, 34)
+				starsRow.Parent = container
+
+				local starsLayout = Instance.new("UIListLayout")
+				starsLayout.FillDirection = Enum.FillDirection.Horizontal
+				starsLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+				starsLayout.VerticalAlignment = Enum.VerticalAlignment.Center
+				starsLayout.Padding = UDim.new(0, 6)
+				starsLayout.Parent = starsRow
+
+				local inputBox = Instance.new("TextBox")
+				inputBox.Name = "PreciseInput"
+				inputBox.BackgroundColor3 = Color3.fromRGB(13, 13, 13)
+				inputBox.TextColor3 = Color3.fromRGB(225, 225, 225)
+				inputBox.PlaceholderColor3 = Color3.fromRGB(120, 120, 120)
+				inputBox.TextXAlignment = Enum.TextXAlignment.Center
+				inputBox.ClearTextOnFocus = false
+				inputBox.Font = Enum.Font.Gotham
+				inputBox.TextSize = 13
+				inputBox.PlaceholderText = "Rating 0-5 (e.g. 3.7 or 3,7)"
+				inputBox.Size = UDim2.new(1, -20, 0, 28)
+				inputBox.Position = UDim2.new(0, 10, 0, 82)
+				inputBox.Parent = container
+
+				local inputCorner = Instance.new("UICorner")
+				inputCorner.CornerRadius = UDim.new(0, 10)
+				inputCorner.Parent = inputBox
+
+				local optionsRow = Instance.new("Frame")
+				optionsRow.Name = "OptionsRow"
+				optionsRow.BackgroundTransparency = 1
+				optionsRow.Size = UDim2.new(1, -20, 0, 26)
+				optionsRow.Position = UDim2.new(0, 10, 0, 116)
+				optionsRow.Parent = container
+
+				local submitButton = Instance.new("TextButton")
+				submitButton.Name = "Submit"
+				submitButton.AutoButtonColor = false
+				submitButton.BackgroundColor3 = syde.theme.Accent
+				submitButton.BackgroundTransparency = 0.2
+				submitButton.TextColor3 = Color3.fromRGB(255, 255, 255)
+				submitButton.Font = Enum.Font.GothamSemibold
+				submitButton.TextSize = 13
+				submitButton.Text = "Submit Rating"
+				submitButton.Size = UDim2.new(0, 128, 0, 26)
+				submitButton.Position = UDim2.new(1, -128, 0, 0)
+				submitButton.Parent = optionsRow
+
+				local submitCorner = Instance.new("UICorner")
+				submitCorner.CornerRadius = UDim.new(0, 10)
+				submitCorner.Parent = submitButton
+
+				local webhookToggle = Instance.new("TextButton")
+				webhookToggle.Name = "WebhookToggle"
+				webhookToggle.AutoButtonColor = false
+				webhookToggle.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+				webhookToggle.TextColor3 = Color3.fromRGB(220, 220, 220)
+				webhookToggle.Font = Enum.Font.Gotham
+				webhookToggle.TextSize = 12
+				webhookToggle.TextXAlignment = Enum.TextXAlignment.Left
+				webhookToggle.Size = UDim2.new(1, -136, 0, 26)
+				webhookToggle.Position = UDim2.new(0, 0, 0, 0)
+				webhookToggle.Parent = optionsRow
+
+				local webhookCorner = Instance.new("UICorner")
+				webhookCorner.CornerRadius = UDim.new(0, 10)
+				webhookCorner.Parent = webhookToggle
+
+				local starNodes = {}
+				local currentRating = clampRating(data.Default) or 0
+				local sendToWebhook = data.SendWebhookDefault and data.WebHook ~= ""
+				local webhookAvailable = data.AllowWebhookOption and data.WebHook ~= ""
+
+				local function updateWebhookToggleVisual()
+					if not webhookAvailable then
+						webhookToggle.Text = "Webhook: unavailable"
+						webhookToggle.TextColor3 = Color3.fromRGB(145, 145, 145)
+						webhookToggle.BackgroundColor3 = Color3.fromRGB(18, 18, 18)
+						return
+					end
+
+					webhookToggle.Text = sendToWebhook and "Webhook: ON" or "Webhook: OFF"
+					webhookToggle.TextColor3 = sendToWebhook and Color3.fromRGB(210, 245, 210) or Color3.fromRGB(225, 225, 225)
+					webhookToggle.BackgroundColor3 = sendToWebhook and Color3.fromRGB(26, 50, 28) or Color3.fromRGB(20, 20, 20)
+				end
+
+				local function setStarFill(index, fraction)
+					local node = starNodes[index]
+					if not node then
+						return
+					end
+					local fillPercent = math.clamp(fraction, 0, 1)
+					node.FillClip.Size = UDim2.new(fillPercent, 0, 1, 0)
+				end
+
+				local function updateStars()
+					for i = 1, 5 do
+						local starValue = math.clamp(currentRating - (i - 1), 0, 1)
+						setStarFill(i, starValue)
+					end
+				end
+
+				local function setRating(value, updateInput)
+					local parsed = clampRating(value)
+					if not parsed then
+						return false
+					end
+					currentRating = parsed
+					updateStars()
+					if updateInput then
+						inputBox.Text = formatRating(currentRating)
+					end
+					return true
+				end
+
+				local starGlyph = utf8.char(9733)
+				for i = 1, 5 do
+					local starHolder = Instance.new("Frame")
+					starHolder.Name = "Star" .. tostring(i)
+					starHolder.BackgroundTransparency = 1
+					starHolder.Size = UDim2.new(0, 34, 0, 34)
+					starHolder.Parent = starsRow
+
+					local emptyStar = Instance.new("TextLabel")
+					emptyStar.BackgroundTransparency = 1
+					emptyStar.Text = starGlyph
+					emptyStar.Font = Enum.Font.GothamBold
+					emptyStar.TextSize = 30
+					emptyStar.TextColor3 = Color3.fromRGB(70, 70, 70)
+					emptyStar.Size = UDim2.fromScale(1, 1)
+					emptyStar.Parent = starHolder
+
+					local fillClip = Instance.new("Frame")
+					fillClip.Name = "FillClip"
+					fillClip.BackgroundTransparency = 1
+					fillClip.ClipsDescendants = true
+					fillClip.Size = UDim2.new(0, 0, 1, 0)
+					fillClip.Parent = starHolder
+
+					local fillStar = Instance.new("TextLabel")
+					fillStar.BackgroundTransparency = 1
+					fillStar.Text = starGlyph
+					fillStar.Font = Enum.Font.GothamBold
+					fillStar.TextSize = 30
+					fillStar.TextColor3 = Color3.fromRGB(255, 197, 61)
+					fillStar.Size = UDim2.fromScale(1, 1)
+					fillStar.Parent = fillClip
+
+					local hitbox = Instance.new("TextButton")
+					hitbox.BackgroundTransparency = 1
+					hitbox.Text = ""
+					hitbox.Size = UDim2.fromScale(1, 1)
+					hitbox.Parent = starHolder
+
+					hitbox.MouseButton1Click:Connect(function()
+						setRating(i, true)
+					end)
+
+					starNodes[i] = {
+						FillClip = fillClip,
+					}
+				end
+
+				inputBox.FocusLost:Connect(function(enterPressed)
+					if not enterPressed then
+						return
+					end
+					local parsed = parseRatingText(inputBox.Text)
+					if not parsed then
+						inputBox.Text = formatRating(currentRating)
+						syde:Notify({
+							Title = "Invalid Rating",
+							Content = "Use a number from 0 to 5 (example: 3.7 or 3,7).",
+							Duration = 3
+						})
+						return
+					end
+					setRating(parsed, true)
+				end)
+
+				webhookToggle.MouseButton1Click:Connect(function()
+					if not webhookAvailable then
+						return
+					end
+					sendToWebhook = not sendToWebhook
+					updateWebhookToggleVisual()
+				end)
+
+				local function sendRatingToWebhook(ratingValue)
+					if not webhookAvailable or not sendToWebhook then
+						return false, "webhook disabled"
+					end
+
+					local req = getRequestFunction()
+					if not req then
+						return false, "request function unavailable"
+					end
+
+					local payload = {
+						username = "Syde Ratings",
+						content = string.format("Rating submitted for **%s**: `%s/5`", tostring(data.Title), formatRating(ratingValue)),
+					}
+
+					local okEncode, body = pcall(function()
+						return https:JSONEncode(payload)
+					end)
+					if not okEncode then
+						return false, "json encode failed"
+					end
+
+					local okRequest, response = pcall(function()
+						local requestArgs = {
+							Url = data.WebHook,
+							url = data.WebHook,
+							Method = "POST",
+							method = "POST",
+							Headers = {
+								["Content-Type"] = "application/json"
+							},
+							headers = {
+								["Content-Type"] = "application/json"
+							},
+							Body = body,
+							body = body,
+						}
+						return req(requestArgs)
+					end)
+
+					if not okRequest then
+						return false, tostring(response)
+					end
+
+					local statusCode = tonumber(response and (response.StatusCode or response.Status))
+					if statusCode and statusCode >= 200 and statusCode < 300 then
+						return true
+					end
+
+					return false, "status " .. tostring(statusCode or "unknown")
+				end
+
+				submitButton.MouseButton1Click:Connect(function()
+					local parsed = parseRatingText(inputBox.Text)
+					if parsed then
+						setRating(parsed, true)
+					end
+
+					if currentRating <= 0 then
+						syde:Notify({
+							Title = "Rating",
+							Content = "Choose a rating greater than 0.",
+							Duration = 2
+						})
+						return
+					end
+
+					local sent = false
+					local sendErr = nil
+					if webhookAvailable and sendToWebhook then
+						local ok, err = sendRatingToWebhook(currentRating)
+						sent = ok
+						sendErr = err
+					elseif webhookAvailable and not sendToWebhook then
+						sendErr = "webhook toggle is OFF"
+					end
+
+					local msg = "Saved: " .. formatRating(currentRating) .. "/5"
+					if webhookAvailable and sendToWebhook then
+						msg = sent and (msg .. " | Webhook sent") or (msg .. " | Webhook failed (" .. tostring(sendErr) .. ")")
+					end
+
+					syde:Notify({
+						Title = "Rating Submitted",
+						Content = msg,
+						Duration = 4
+					})
+				end)
+
+				setRating(currentRating, true)
+				updateWebhookToggleVisual()
+				return container
+			end
 
 		--@@KeyBind
 		function initelement:Keybind(Keybind)
@@ -9675,7 +10186,8 @@ local function applyMinihomeInfoTransparency()
 			ScrollFrame.Position = UDim2.new(ScrollFrame.Position.X.Scale, ScrollFrame.Position.X.Offset, 0, startY)
 
 			if ZoomAmountLabel then
-				ZoomAmountLabel.Text = string.format("%.2f", distance)
+				-- Bug Fix: 'distance' war hier nicht definiert, initialZoom wird direkt verwendet
+				ZoomAmountLabel.Text = string.format("%.2f", initialZoom)
 			end
 
 			ZoomFrame.InputBegan:Connect(function(input)
@@ -11076,7 +11588,8 @@ local function applyMinihomeInfoTransparency()
 						Duration = 3
 					})
 					print("Configuration loaded successfully from a previous session.")
-				elseif not success then
+				else
+					-- Bug Fix: 'elseif not success' war redundant (success ist bereits false)
 					warn("[SYDE] Configurations Error " .. tostring(result))
 				end
 			end
