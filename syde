@@ -214,67 +214,21 @@ local syde = {
 	Flags = {};
 	SettingsFlags = {};
 	UIAnimationsEnabled = true;
-	DebugEnabled = __sydeInitialDebugEnabled;
-	DebugPrefix = "SYDE-DEBUG";
 };
 
 -- @Utilities
 
-function syde:SetDebug(enabled)
-	self.DebugEnabled = enabled == true
-	if __sydeEnv then
-		__sydeEnv.__SYDE_DEBUG_ENABLED = self.DebugEnabled
-		__sydeEnv["syde-debug"] = self.DebugEnabled
-	end
-	print(("[SYDE] Debug prints %s"):format(self.DebugEnabled and "enabled" or "disabled"))
-end
+function syde:SetDebug(enabled) end
 
-function syde:IsDebugEnabled()
-	return self.DebugEnabled == true
-end
 
-function syde:DebugPrint(...)
-	if not self.DebugEnabled then
-		return
-	end
-
-	local parts = table.create(select("#", ...))
-	for i = 1, select("#", ...) do
-		parts[i] = tostring(select(i, ...))
-	end
-	print(("[%s] %s"):format(self.DebugPrefix, table.concat(parts, " ")))
-end
-
--- Convenience alias for scripts that prefer dprint-style naming.
-function syde:dprint(...)
-	return self:DebugPrint(...)
-end
+-- Dummy methods to prevent external scripts (like old test scripts) from crashing
+function syde:dprint(...) end
+function syde:DebugPrint(...) end
+function syde:_Debug(...) end
 
 -- Alias for Toast to match some external script expectations
 function syde:Notify(data)
 	return self:Toast(data)
-end
-
-function syde:IsDebugEnabled()
-	return self.DebugEnabled == true
-end
-
-function syde:_Debug(tag, message, ...)
-	if not self.DebugEnabled then
-		return
-	end
-
-	local text = message
-	if select("#", ...) > 0 then
-		local ok, formatted = pcall(string.format, message, ...)
-		if ok then
-			text = formatted
-		else
-			text = tostring(message)
-		end
-	end
-
-	print(("[%s][%s] %s"):format(self.DebugPrefix, tostring(tag or "General"), tostring(text)))
 end
 
 function syde:DeepMerge(target, source)
@@ -3153,8 +3107,8 @@ function syde:Init(library)
 
 		-- Ensure Library stays in CoreGui
 		task.spawn(function()
-			while Library and Library.Parent do
-				task.wait(1)
+			while Library and task.wait(1) do
+				if not Library.Parent then break end -- Exit if intentionally destroyed
 				if Library.Parent ~= coregui then
 					warn("[SYDE] UI moved. Restoring...")
 					pcall(function()
