@@ -218,6 +218,20 @@ local syde = {
 
 -- @Utilities
 
+function syde:getMember(parent, name)
+	if not parent then return nil end
+	local child = parent:FindFirstChild(name)
+	if child then return child end
+	
+	for _, v in ipairs(parent:GetChildren()) do
+		if v:IsA("Instance") then
+			local found = self:getMember(v, name)
+			if found then return found end
+		end
+	end
+	return nil
+end
+
 
 -- Alias for Toast to match some external script expectations
 function syde:Notify(data)
@@ -3582,7 +3596,11 @@ local function applyMinihomeInfoTransparency()
 
 	-- Syde Connection (Coming Soon)
 	SetUserInfo()
-	tweenservice:Create(window.user.headshot.id.username, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = UDim2.new(0, window.user.headshot.id.username.TextBounds.X + 10,0, 10)}):Play()
+	local headshot = syde:getMember(window, "headshot")
+	local username = syde:getMember(headshot, "username")
+	if username then
+		tweenservice:Create(username, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Size = UDim2.new(0, username.TextBounds.X + 10,0, 10)}):Play()
+	end
 
 	if userinfodisabled == false then
 		tweenservice:Create(window.tabs, TweenInfo.new(0.4, Enum.EasingStyle.Exponential), {Size = UDim2.new(0, 200,1, -115) }):Play()
