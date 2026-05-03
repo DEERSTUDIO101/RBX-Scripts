@@ -2801,15 +2801,115 @@ end
 
 
 --@SetupFunctionst
+
+function syde:Rejoin()
+	local ts = game:GetService("TeleportService")
+	local p = game:GetService("Players").LocalPlayer
+	ts:Teleport(game.PlaceId, p)
+end
+
+function syde:ServerHop()
+	local ts = game:GetService("TeleportService")
+	local p = game:GetService("Players").LocalPlayer
+	local http = game:GetService("HttpService")
+	
+	local success, servers = pcall(function()
+		return http:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100")).data
+	end)
+	
+	if success and servers then
+		for _, v in pairs(servers) do
+			if v.playing < v.maxPlayers and v.id ~= game.JobId then
+				ts:TeleportToPlaceInstance(game.PlaceId, v.id, p)
+				return
+			end
+		end
+	end
+	syde:Toast({Content = "No other servers found.", Duration = 3})
+end
+
+local userMenuOpen = false
+local userMenuFrame = nil
+
+function syde:ToggleUserMenu()
+	if userMenuOpen then
+		userMenuOpen = false
+		if userMenuFrame then
+			tweenservice:Create(userMenuFrame, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Size = UDim2.new(0, 150, 0, 0), BackgroundTransparency = 1}):Play()
+			task.delay(0.3, function() if userMenuFrame then userMenuFrame.Visible = false end end)
+		end
+		return
+	end
+
+	if not userMenuFrame then
+		userMenuFrame = Instance.new("Frame")
+		userMenuFrame.Name = "UserActions"
+		userMenuFrame.Parent = window
+		userMenuFrame.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+		userMenuFrame.Position = UDim2.new(0, 10, 1, -165)
+		userMenuFrame.Size = UDim2.new(0, 150, 0, 0)
+		userMenuFrame.ClipsDescendants = true
+		userMenuFrame.ZIndex = 10
+		
+		local corner = Instance.new("UICorner", userMenuFrame)
+		corner.CornerRadius = UDim.new(0, 8)
+		
+		local stroke = Instance.new("UIStroke", userMenuFrame)
+		stroke.Color = Color3.fromRGB(45, 45, 45)
+		stroke.Thickness = 1
+		
+		local layout = Instance.new("UIListLayout", userMenuFrame)
+		layout.Padding = UDim.new(0, 5)
+		layout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+		layout.SortOrder = Enum.SortOrder.LayoutOrder
+		
+		local padding = Instance.new("UIPadding", userMenuFrame)
+		padding.PaddingTop = UDim.new(0, 8)
+		padding.PaddingBottom = UDim.new(0, 8)
+
+		local function createAction(name, callback)
+			local btn = Instance.new("TextButton")
+			btn.Name = name
+			btn.Parent = userMenuFrame
+			btn.Size = UDim2.new(0.9, 0, 0, 30)
+			btn.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+			btn.Text = name
+			btn.TextColor3 = Color3.fromRGB(200, 200, 200)
+			btn.Font = Enum.Font.GothamMedium
+			btn.TextSize = 12
+			btn.AutoButtonColor = true
+			
+			local bCorner = Instance.new("UICorner", btn)
+			bCorner.CornerRadius = UDim.new(0, 6)
+			
+			btn.MouseButton1Click:Connect(function()
+				syde:ToggleUserMenu()
+				callback()
+			end)
+		end
+
+		createAction("Rejoin Server", function() syde:Rejoin() end)
+		createAction("Server Hop", function() syde:ServerHop() end)
+		createAction("Copy JobId", function() if setclipboard then setclipboard(game.JobId) syde:Toast({Content = "JobId copied!"}) end end)
+	end
+
+	userMenuOpen = true
+	userMenuFrame.Visible = true
+	tweenservice:Create(userMenuFrame, TweenInfo.new(0.4, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = UDim2.new(0, 150, 0, 120), BackgroundTransparency = 0}):Play()
+end
+
 function SetUserInfo()
-	print('set')
 	local LocalPlayer = player.LocalPlayer
 
 	local PLACEHOLDER_IMAGE = "rbxassetid://0" 
 	local THUMBNAIL_TYPE = Enum.ThumbnailType.HeadShot
 	local THUMBNAIL_SIZE = Enum.ThumbnailSize.Size420x420
 
-	local imageLabel = window:WaitForChild("user"):WaitForChild("headshot")
+	local userFrame = window:FindFirstChild("user")
+	local imageLabel = userFrame and userFrame:FindFirstChild("headshot")
+	
+	if not imageLabel then return end
+
 	imageLabel.Image = PLACEHOLDER_IMAGE
 
 	local success, thumbnail = pcall(function()
@@ -2818,10 +2918,26 @@ function SetUserInfo()
 
 	if success and thumbnail then
 		imageLabel.Image = thumbnail
-		window.user.headshot.id.username.Text = LocalPlayer.Name
-		window.user.headshot.id.displayname.Text = "@"..LocalPlayer.DisplayName
+		if imageLabel:FindFirstChild("id") then
+			if imageLabel.id:FindFirstChild("username") then imageLabel.id.username.Text = LocalPlayer.Name end
+			if imageLabel.id:FindFirstChild("displayname") then imageLabel.id.displayname.Text = "@"..LocalPlayer.DisplayName end
+		end
 	else
 		imageLabel.Image = PLACEHOLDER_IMAGE
+	end
+
+	-- Add interaction button if not present
+	if userFrame and not userFrame:FindFirstChild("ActionBtn") then
+		local btn = Instance.new("TextButton")
+		btn.Name = "ActionBtn"
+		btn.Size = UDim2.new(1, 0, 1, 0)
+		btn.BackgroundTransparency = 1
+		btn.Text = ""
+		btn.ZIndex = 11
+		btn.Parent = userFrame
+		btn.MouseButton1Click:Connect(function()
+			syde:ToggleUserMenu()
+		end)
 	end
 end
 
