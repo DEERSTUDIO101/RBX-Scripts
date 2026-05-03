@@ -218,13 +218,6 @@ local syde = {
 
 -- @Utilities
 
-function syde:SetDebug(enabled) end
-
-
--- Dummy methods to prevent external scripts (like old test scripts) from crashing
-function syde:dprint(...) end
-function syde:DebugPrint(...) end
-function syde:_Debug(...) end
 
 -- Alias for Toast to match some external script expectations
 function syde:Notify(data)
@@ -234,7 +227,7 @@ end
 function syde:DeepMerge(target, source)
 	for k, v in pairs(source) do
 		if type(v) == "table" and type(target[k]) == "table" then
-			self:DeepMerge(target[k], v) 
+			syde:DeepMerge(target[k], v) 
 		else
 			target[k] = v
 		end
@@ -1327,15 +1320,10 @@ do
 		end
 		if debugSetting ~= nil then
 			if type(debugSetting) == "string" then
-				local normalized = string.lower(debugSetting)
-				self:SetDebug(normalized == "true" or normalized == "1" or normalized == "yes" or normalized == "on")
 			else
-				self:SetDebug(debugSetting == true)
 			end
 		end
-		self:_Debug("Load", "syde:Load called (Name=%s, Status=%s)", tostring(Config.Name or "nil"), tostring(Config.Status or "nil"))
 		task.wait(1)
-		self:_Debug("Load", "Loader assets mounted")
 		local LOADER = Loader
 		LOADER.Enabled = true
 		LOADER.Parent = coregui
@@ -1644,7 +1632,7 @@ do
 			task.spawn(function()
 				while Library and Library.Parent do
 					task.wait(1)
-					if Library.Parent ~= coregui then
+					if Library.Parent and Library.Parent ~= coregui then
 						warn("Syde 〡 UI moved. Restoring...")
 						pcall(function()
 							Library.Parent = coregui
@@ -2360,7 +2348,7 @@ end
 
 function syde:Notify(Notification)
 	task.spawn(function()
-		syde:_Debug("Notify", "Notify called (Title=%s, Duration=%s)", tostring(Notification and Notification.Title or "nil"), tostring(Notification and Notification.Duration or "nil"))
+
 
 		local NotifData = {
 			Title = Notification.Title;
@@ -2381,7 +2369,6 @@ function syde:Notify(Notification)
 		Notification.Content.Text = NotifData.Content
 		Notification.Content.Size = UDim2.new(0, 200,0, Notification.Content.TextBounds.Y )
 		Notification.icon.Image = 'rbxassetid://'..NotifData.Icon
-		syde:_Debug("Notify", "Icon id resolved: %s", tostring(NotifData.Icon))
 		Notification.icon.Visible = true
 
 
@@ -2481,7 +2468,7 @@ local activeModals = 0 -- track how many modals are currently open
 
 function syde:Modal(Modal)
 	task.spawn(function()
-		syde:_Debug("Modal", "Modal opened (Title=%s)", tostring(Modal and Modal.Title or "nil"))
+
 		local ModalData = {
 			Title = Modal.Title;
 			Content = Modal.Content;
@@ -3177,7 +3164,7 @@ syde:HidePH(pages, 'page')
 
 --@@Initialize
 function syde:Init(library)
-	syde:_Debug("Init", "syde:Init called (Title=%s)", tostring(library and library.Title or "nil"))
+
 
 	ui.Enabled = true
 	if loaded == false then
@@ -3223,9 +3210,9 @@ function syde:Init(library)
 
 		-- Ensure Library stays in CoreGui
 		task.spawn(function()
-			while Library and task.wait(1) do
-				if not Library.Parent then break end -- Exit if intentionally destroyed
-				if Library.Parent ~= coregui then
+			while Library and Library.Parent do
+				task.wait(1)
+				if Library.Parent and Library.Parent ~= coregui then
 					warn("[SYDE] UI moved. Restoring...")
 					pcall(function()
 						Library.Parent = coregui
@@ -6498,39 +6485,48 @@ local function applyMinihomeInfoTransparency()
 				local Para = window.settings.pages.page.Paragraph:Clone()
 				Para.Visible = true
 				Para.Parent = Page
-				Para.Frame.title.Text = ParaData.Title
-				Para.Content.Text = ParaData.Content
+				
+				local titleLabel = syde:getMember(Para, "title")
+				local contentLabel = syde:getMember(Para, "Content")
+				
+				if titleLabel and titleLabel:IsA("TextLabel") then titleLabel.Text = ParaData.Title end
+				if contentLabel and contentLabel:IsA("TextLabel") then contentLabel.Text = ParaData.Content end
 
-				Para.Content.Size = UDim2.new(1, -20, 0, Para.Content.TextBounds.Y)
+				if contentLabel then
+					contentLabel.Size = UDim2.new(1, -20, 0, contentLabel.TextBounds.Y)
+				end
 				--	Para.Size = UDim2.new(1, -35, 0, Para.Content.Size.Y.Offset + 200)
 
 				local function updateSize()
+					if not contentLabel then return end
 					local textSize = textservice:GetTextSize(
-						Para.Content.Text,
-						Para.Content.TextSize,
-						Para.Content.Font,
-						Vector2.new(Para.Content.AbsoluteSize.X, math.huge) -- Allows vertical expansion
+						contentLabel.Text,
+						contentLabel.TextSize,
+						contentLabel.Font,
+						Vector2.new(contentLabel.AbsoluteSize.X, math.huge) -- Allows vertical expansion
 					)
 
 					local newDescSize = UDim2.new(1, -20, 0, textSize.Y)
 					local newButtonSize = UDim2.new(Para.Size.X.Scale, Para.Size.X.Offset, 0, textSize.Y + 120) -- Adding extra padding
 
-					local descTween = tweenservice:Create(Para.Content, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize })
-					descTween:Play()
-
-					local buttonTween = tweenservice:Create(Para, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newButtonSize })
-					buttonTween:Play()
+					tweenservice:Create(contentLabel, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newDescSize }):Play()
+					tweenservice:Create(Para, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), { Size = newButtonSize }):Play()
 				end
 
 				updateSize()
 
-				Para.Content:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+				if contentLabel then
+					contentLabel:GetPropertyChangedSignal("TextBounds"):Connect(updateSize)
+				end
 
 				local ParagraphSettings = {}
 
 				function ParagraphSettings:Set(text, title)
-					Para.Frame.title.Text = title
-					Para.Content.Text = text
+					local titleLabel = syde:getMember(Para, "title")
+					local contentLabel = syde:getMember(Para, "Content")
+					
+					if titleLabel and titleLabel:IsA("TextLabel") then titleLabel.Text = title or "" end
+					if contentLabel and contentLabel:IsA("TextLabel") then contentLabel.Text = text or "" end
 				end
 
 				ParagraphSettings.Instance = Para
@@ -7923,7 +7919,7 @@ local function applyMinihomeInfoTransparency()
 	}
 
 	function tbdata:InitTab(tab)
-		syde:_Debug("Tab", "InitTab called (Title=%s, Locked=%s)", tostring(tab and tab.Title or "nil"), tostring(tab and tab.Locked or false))
+
 		-- bootstrap Home-mode once so first-created tabs don't auto-open
 
 		if Data.Home.Enabled then
@@ -7968,12 +7964,14 @@ local function applyMinihomeInfoTransparency()
 		end
 
 		Tab.Visible = true
-		Tab.Parent = tabs_container or tabs.Parent or window
-		Tab.title.Text = tdata.Title
+		Tab.Parent = tabs or tabs_container or window
+		local tabTitle = syde:getMember(Tab, "title")
+		if tabTitle then tabTitle.Text = tdata.Title end
 		Tab.Name = tdata.Title
 
-		Tab.title.TextTransparency = 1
-		Tab.indicator.BackgroundTransparency = 1
+		if tabTitle then tabTitle.TextTransparency = 1 end
+		local indicator = syde:getMember(Tab, "indicator")
+		if indicator then indicator.BackgroundTransparency = 1 end
 
 		--[Page Setup]
 		local Page = pages.page:Clone()
@@ -8094,23 +8092,30 @@ local function applyMinihomeInfoTransparency()
 		local isInit = true
 
 		local function ApplyTabStyle(tabButton, isSelected)
+			local titleLabel = syde:getMember(tabButton, "title")
+			local indicator = syde:getMember(tabButton, "indicator")
+			local glow = syde:getMember(indicator, "glow")
+			
+			local textBoundsX = titleLabel and titleLabel.TextBounds.X or 50
+			
 			local targetTextTransparency = isSelected and 0 or 0.6
 			local targetBackgroundTransparency = isSelected and 0 or 0.45
 			local targetTransparency = isSelected and 0 or 1
 			local targetColor = isSelected and syde.theme.Accent or Color3.fromRGB(29, 29, 29)
-			local targetSize = isSelected and UDim2.new(0, tabButton.title.TextBounds.X + 80,0, 35) or UDim2.new(0, tabButton.title.TextBounds.X + 50,0, 35)
+			local targetSize = isSelected and UDim2.new(0, textBoundsX + 80,0, 35) or UDim2.new(0, textBoundsX + 50,0, 35)
 
 
 			if isInit then
+				isInit = false
 				task.spawn(function()
 					for _, v in ipairs(tabs:GetChildren()) do
-						if v:IsA("Frame") then
-							tweenOrSet(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, v.title.TextBounds.X + 100,0, 30) })
+						local vTitle = syde:getMember(v, "title")
+						if v:IsA("Frame") and vTitle then
+							tweenOrSet(v, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = UDim2.new(0, vTitle.TextBounds.X + 100,0, 30) })
 							if uiAnimationsEnabled then
 								task.wait(0.15)
 							end
 							tweenOrSet(tabButton, TweenInfo.new(0.75, Enum.EasingStyle.Quart), { Size = targetSize })
-							isInit = false
 						end
 					end
 				end)
@@ -8120,24 +8125,29 @@ local function applyMinihomeInfoTransparency()
 			if not uiAnimationsEnabled then
 				tabButton.Size = targetSize
 				tabButton.BackgroundTransparency = targetBackgroundTransparency
-				tabButton.title.TextTransparency = targetTextTransparency
-				tabButton.indicator.glow.ImageColor3 = targetColor
-				tabButton.indicator.glow.ImageTransparency = isSelected and 0.78 or 1
-				tabButton.indicator.BackgroundColor3 = targetColor
-				tabButton.indicator.BackgroundTransparency = isSelected and 0 or 1
+				if titleLabel then titleLabel.TextTransparency = targetTextTransparency end
+				if glow then
+					glow.ImageColor3 = targetColor
+					glow.ImageTransparency = isSelected and 0.78 or 1
+				end
+				if indicator then
+					indicator.BackgroundColor3 = targetColor
+					indicator.BackgroundTransparency = isSelected and 0 or 1
+				end
 				return
 			end
 
 			tweenservice:Create(tabButton, positionTweenInfo, { Size = targetSize }):Play()
 			tweenservice:Create(tabButton, colorTweenInfo, { BackgroundTransparency = targetBackgroundTransparency, }):Play()
-			tweenservice:Create(tabButton.title, colorTweenInfo, { TextTransparency = targetTextTransparency }):Play()
-			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageColor3 = targetColor }):Play()
-			tweenservice:Create(tabButton.indicator.glow, colorTweenInfo, { ImageTransparency = isSelected and 0.78 or 1 }):Play()
-
-			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundColor3 = targetColor }):Play()
-			tweenservice:Create(tabButton.indicator, colorTweenInfo, { BackgroundTransparency = isSelected and 0 or 1 }):Play()
-
-
+			if titleLabel then tweenservice:Create(titleLabel, colorTweenInfo, { TextTransparency = targetTextTransparency }):Play() end
+			if glow then
+				tweenservice:Create(glow, colorTweenInfo, { ImageColor3 = targetColor }):Play()
+				tweenservice:Create(glow, colorTweenInfo, { ImageTransparency = isSelected and 0.78 or 1 }):Play()
+			end
+			if indicator then
+				tweenservice:Create(indicator, colorTweenInfo, { BackgroundColor3 = targetColor }):Play()
+				tweenservice:Create(indicator, colorTweenInfo, { BackgroundTransparency = isSelected and 0 or 1 }):Play()
+			end
 		end
 		ApplyTabStyle(Tab, isFirstTab)
 
@@ -8527,7 +8537,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Button
 		function initelement:Button(Button)
-			syde:_Debug("Element", "Button created (Title=%s)", tostring(Button and Button.Title or "Temp Button"))
+
 			local data = {
 				Title = Button.Title or "Temp Button";
 				CallBack = Button.CallBack;
@@ -8709,7 +8719,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Toggle
 		function initelement:Toggle(Toggle)
-			syde:_Debug("Element", "Toggle created (Title=%s, Default=%s)", tostring(Toggle and Toggle.Title or "Temp Toggle"), tostring(Toggle and Toggle.Value or false))
+
 			local data = {
 				Title = Toggle.Title or "Temp Toggle";
 				Desc = Toggle.Description or "";
@@ -9376,12 +9386,10 @@ local function applyMinihomeInfoTransparency()
 
 		-- Compatibility aliases for older test/demo scripts
 		function initelement:CreateSlider(Slider)
-			syde:_Debug("Element", "CreateSlider alias invoked")
 			return self:Slider(Slider)
 		end
 
 		function initelement:Img(ImgData)
-			syde:_Debug("Element", "Image created (Title=%s)", tostring(ImgData and ImgData.Title or "Image"))
 			local data = {
 				Title = ImgData and (ImgData.Title or "Image") or "Image";
 				Image = ImgData and (ImgData.Image or ImgData.Id) or "";
@@ -9435,7 +9443,6 @@ local function applyMinihomeInfoTransparency()
 		end
 
 			function initelement:Rate(RateData)
-				syde:_Debug("Element", "Rate created (Title=%s)", tostring(RateData and RateData.Title or "Rating"))
 				local data = {
 					Title = (RateData and RateData.Title) or "Rating";
 					WebHook = (RateData and RateData.WebHook) or "";
@@ -9819,7 +9826,6 @@ local function applyMinihomeInfoTransparency()
 
 		--@@KeyBind
 		function initelement:Keybind(Keybind)
-			syde:_Debug("Element", "Keybind created (Title=%s, Key=%s)", tostring(Keybind and Keybind.Title or "nil"), tostring(Keybind and Keybind.Key and Keybind.Key.Name or "NONE"))
 			local data = {
 				Title = Keybind.Title;
 				Key = Keybind.Key;
@@ -9910,7 +9916,6 @@ local function applyMinihomeInfoTransparency()
 
 		--@@TextInput
 		function initelement:TextInput(TextInput)
-			syde:_Debug("Element", "TextInput created (Title=%s, NumberOnly=%s)", tostring(TextInput and TextInput.Title or "Text Input"), tostring(TextInput and TextInput.NumberOnly or false))
 			local data = {
 				Title = TextInput.Title or "Text Input",
 				PlaceHolder = TextInput.PlaceHolder or "Enter text...",
@@ -10335,7 +10340,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Labels/Paragraph
 		function initelement:Paragraph(Paragraph)
-			syde:_Debug("Element", "Paragraph created (Title=%s)", tostring(Paragraph and Paragraph.Title or "nil"))
+
 			local ParaData = {
 				Title = Paragraph.Title;
 				Content = Paragraph.Content;
@@ -10375,7 +10380,7 @@ local function applyMinihomeInfoTransparency()
 		end
 
 		function initelement:Label(Text, Alignment)
-			syde:_Debug("Element", "Label created (Text=%s, Alignment=%s)", tostring(Text), tostring(Alignment or "Left"))
+
 
 			local Label = pages.page.Label:Clone()
 			Label.Visible = true
@@ -10393,7 +10398,7 @@ local function applyMinihomeInfoTransparency()
 		end
 
 		function initelement:Section(Title, Icon)
-			syde:_Debug("Element", "Section created (Title=%s, Icon=%s)", tostring(Title), tostring(Icon or "nil"))
+
 			local SectionData = {
 				Title = Title
 			}
@@ -10414,7 +10419,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Dropdown
 		function initelement:Dropdown(Dropdown)
-			syde:_Debug("Element", "Dropdown created (Title=%s, Multi=%s)", tostring(Dropdown and Dropdown.Title or "Temp Dropdown"), tostring(Dropdown and Dropdown.Multi or false))
+
 			local data = {
 				Title = Dropdown.Title or "Temp Dropdown";
 				Options = Dropdown.Options or {};
@@ -10738,7 +10743,7 @@ local function applyMinihomeInfoTransparency()
 
 		--@@Colorpicker
 		function initelement:ColorPicker(ColorPicker)
-			syde:_Debug("Element", "ColorPicker created (Title=%s, Linkable=%s)", tostring(ColorPicker and ColorPicker.Title or "nil"), tostring(ColorPicker and ColorPicker.Linkable))
+
 			local data = {
 				Title = ColorPicker.Title;
 				Color = ColorPicker.Color;
