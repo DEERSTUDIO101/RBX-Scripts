@@ -221,6 +221,15 @@ local syde = {
 	_Debug = function() end;
 };
 
+function syde:SetHomeIcon(icon)
+	if not window or not window:FindFirstChild("tabs") or not window.tabs:FindFirstChild("Home") then return end
+	local homeBtn = window.tabs.Home
+	local homeIcon = homeBtn:FindFirstChild("homeicon")
+	if homeIcon and homeIcon:FindFirstChild("ImageLabel") then
+		homeIcon.ImageLabel.Image = (tonumber(icon) and "rbxassetid://" .. icon) or icon
+	end
+end
+
 -- @Utilities
 
 function syde:getMember(parent, name)
@@ -3628,6 +3637,10 @@ local function applyMinihomeInfoTransparency()
 
 		window.pages.home.general.presence.Profile.ImageLabel.Image = 'rbxassetid://'..Data.Home.profileImage
 		window.pages.home.general.presence.wallpaper.Image = 'rbxassetid://'..Data.Home.profileImage
+
+		if Data.Home.Icon then
+			syde:SetHomeIcon(Data.Home.Icon)
+		end
 		
 		local placeId = game.PlaceId
 
@@ -11129,7 +11142,7 @@ local function applyMinihomeInfoTransparency()
 				end
 
 				g.Pin1.InputBegan:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						DraggingPin = 2
 						ActivePin = 2
 						local h, s, v = Keys[2].Value:ToHSV()
@@ -11139,7 +11152,7 @@ local function applyMinihomeInfoTransparency()
 				end)
 
 				g.Pin2.InputBegan:Connect(function(input)
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						DraggingPin = 3
 						ActivePin = 3
 						local h, s, v = Keys[3].Value:ToHSV()
@@ -11149,7 +11162,7 @@ local function applyMinihomeInfoTransparency()
 				end)
 
 				syde:AddConnection(userinput.InputEnded, function(input) -- Bug Fix: syde:AddConnection
-					if input.UserInputType == Enum.UserInputType.MouseButton1 then
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 						DraggingPin = nil
 					end
 				end)
@@ -11434,7 +11447,7 @@ local function applyMinihomeInfoTransparency()
 			local SV, HUE = nil, nil
 
 			syde:AddConnection(SVPicker.InputBegan, function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					SV = runservice.RenderStepped:Connect(function()
 						local mouse = game.Players.LocalPlayer:GetMouse()
 						local ColorX = math.clamp(mouse.X - SVPicker.AbsolutePosition.X, 0, SVPicker.AbsoluteSize.X) / SVPicker.AbsoluteSize.X
@@ -11449,7 +11462,7 @@ local function applyMinihomeInfoTransparency()
 			end)
 
 			syde:AddConnection(SVPicker.InputEnded, function(i)
-				if i.UserInputType == Enum.UserInputType.MouseButton1 and SV then
+				if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and SV then
 					SV:Disconnect()
 					SV = nil
 					AddRecentColor(data.Color)
@@ -11458,7 +11471,7 @@ local function applyMinihomeInfoTransparency()
 			end)
 
 			syde:AddConnection(HUESlider.InputBegan, function(input)
-				if input.UserInputType == Enum.UserInputType.MouseButton1 then
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 					HUE = runservice.RenderStepped:Connect(function()
 						local mouse = game.Players.LocalPlayer:GetMouse()
 						local ColorX = math.clamp(mouse.X - HUESlider.AbsolutePosition.X, 0, HUESlider.AbsoluteSize.X) / HUESlider.AbsoluteSize.X
@@ -11471,7 +11484,7 @@ local function applyMinihomeInfoTransparency()
 			end)
 
 			syde:AddConnection(HUESlider.InputEnded, function(i)
-				if i.UserInputType == Enum.UserInputType.MouseButton1 and HUE then
+				if (i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch) and HUE then
 					HUE:Disconnect()
 					HUE = nil
 					AddRecentColor(data.Color)
@@ -11547,36 +11560,38 @@ local function applyMinihomeInfoTransparency()
 				return mouse.X >= pos.X and mouse.X <= pos.X + size.X and mouse.Y >= pos.Y and mouse.Y <= pos.Y + size.Y
 			end
 
-			colorpicker.HueValues.Link.Frame.interact.MouseButton1Down:Connect(function()
-				linkDragging = true
-				draggedColorPicker = colorpicker
+			colorpicker.HueValues.Link.Frame.interact.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+					linkDragging = true
+					draggedColorPicker = colorpicker
 
-				TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {Size = UDim2.new(0, 40,1, 0)}):Play()
+					TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {Size = UDim2.new(0, 40,1, 0)}):Play()
 
-				local followMouse
-				followMouse = RunService.RenderStepped:Connect(function()
-					if not linkDragging then
-						followMouse:Disconnect()
-						return
-					end
-					local mouse = game.Players.LocalPlayer:GetMouse()
-					-- colorpicker.HueValues.Link.Frame.Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260)
-					TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260) }):Play()
+					local followMouse
+					followMouse = RunService.RenderStepped:Connect(function()
+						if not linkDragging then
+							followMouse:Disconnect()
+							return
+						end
+						local mouse = game.Players.LocalPlayer:GetMouse()
+						-- colorpicker.HueValues.Link.Frame.Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260)
+						TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.3, Enum.EasingStyle.Quart), {Position = UDim2.new(0, mouse.X - colorpicker.AbsolutePosition.X - 50, 0, mouse.Y - colorpicker.AbsolutePosition.Y - 260) }):Play()
 
-					for _, otherPicker in pairs(Page:GetChildren()) do
-						if otherPicker:IsA("Frame") and otherPicker:FindFirstChild("isLinkable") and otherPicker.isLinkable.Value then
-							if isMouseOver(otherPicker) and otherPicker ~= draggedColorPicker then
-								TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
-							else
-								TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+						for _, otherPicker in pairs(Page:GetChildren()) do
+							if otherPicker:IsA("Frame") and otherPicker:FindFirstChild("isLinkable") and otherPicker.isLinkable.Value then
+								if isMouseOver(otherPicker) and otherPicker ~= draggedColorPicker then
+									TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 0}):Play()
+								else
+									TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+								end
 							end
 						end
-					end
-				end)
+					end)
+				end
 			end)
 
 			syde:AddConnection(userinput.InputEnded, function(input) -- Bug Fix: syde:AddConnection
-				if input.UserInputType == Enum.UserInputType.MouseButton1 and linkDragging then
+				if (input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch) and linkDragging then
 					linkDragging = false
 					local foundTarget = false
 
