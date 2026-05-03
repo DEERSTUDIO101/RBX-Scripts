@@ -250,6 +250,11 @@ function syde:dprint(...)
 	return self:DebugPrint(...)
 end
 
+-- Alias for Toast to match some external script expectations
+function syde:Notify(data)
+	return self:Toast(data)
+end
+
 function syde:IsDebugEnabled()
 	return self.DebugEnabled == true
 end
