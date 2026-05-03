@@ -9800,7 +9800,7 @@ local function applyMinihomeInfoTransparency()
 					else
 						if data.Hold then
 							local holdLoop
-							holdLoop = runservice.RenderStepped:Connect(function()
+							holdLoop = syde:AddConnection(runservice.RenderStepped, function() -- Bug Fix: syde:AddConnection für Cleanup
 								if not data.Hold then
 									data.CallBack(false)
 									holdLoop:Disconnect()
@@ -10145,7 +10145,7 @@ local function applyMinihomeInfoTransparency()
 				Camera.CFrame = CFrame.new(Vector3.new(0, 0, distance), Vector3.new(0, 0, 0))
 				if ZoomAmountLabel then
 					tweenservice:Create(ZoomAmountLabel, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Position = UDim2.new(1, 0,0.5, -20)}):Play()
-					task.wait(0.045)
+					-- Bug Fix: task.wait(0.045) entfernt (verhindert Stapelung bei schnellem Scrollen)
 					ZoomAmountLabel.Text = 'x'..string.format("%.2f", distance)
 					ZoomAmountLabel.Position = UDim2.new(1, 0,0.5, 20)
 					tweenservice:Create(ZoomAmountLabel, TweenInfo.new(0.8, Enum.EasingStyle.Elastic), {Position = UDim2.new(1, 0,0.5, 0)}):Play()
@@ -10554,12 +10554,12 @@ local function applyMinihomeInfoTransparency()
 							end
 						else
 							-- Hide with animation, but wait before setting Visible = false
-							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundTransparency = 1}):Play()
-							tweenservice:Create(option, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {BackgroundColor3 = Color3.fromRGB(33, 33, 33)}):Play()
-							tweenservice:Create(option.Title, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {TextTransparency = 1}):Play()
-							tweenservice:Create(option.UIStroke, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-							tweenservice:Create(option.ImageLabel, TweenInfo.new(0.7, Enum.EasingStyle.Exponential), {ImageTransparency = 1}):Play()
-							option.Visible = false
+							-- Bug Fix: Visible erst nach Tween auf false setzen, um Animation nicht abzubrechen
+							task.delay(0.7, function()
+								if not shouldShow then
+									option.Visible = false
+								end
+							end)
 						end
 					end
 				end
@@ -10657,7 +10657,8 @@ local function applyMinihomeInfoTransparency()
 				Flag = ColorPicker.Flag;
 			}
 
-			ColorPicker.Linkable = ColorPicker.Linkable or true
+			-- Bug Fix: Boolean Defaulting korrigiert
+			if data.Linkable == nil then data.Linkable = true end
 
 
 			local colorpicker = pages.page.ColorPicker:Clone()
@@ -11025,16 +11026,16 @@ local function applyMinihomeInfoTransparency()
 					end
 				end)
 
-				UIS.InputEnded:Connect(function(input)
+				syde:AddConnection(userinput.InputEnded, function(input) -- Bug Fix: syde:AddConnection
 					if input.UserInputType == Enum.UserInputType.MouseButton1 then
 						DraggingPin = nil
 					end
 				end)
 
-				RS.Heartbeat:Connect(function()
+				syde:AddConnection(runservice.Heartbeat, function() -- Bug Fix: syde:AddConnection
 					if not DraggingPin then return end
 
-					local relX = (mouse.X - g.AbsolutePosition.X) / g.AbsoluteSize.X
+					local relX = (game.Players.LocalPlayer:GetMouse().X - g.AbsolutePosition.X) / g.AbsoluteSize.X
 					relX = math.clamp(relX, 0, 1)
 
 					if DraggingPin == 2 then
@@ -11411,9 +11412,7 @@ local function applyMinihomeInfoTransparency()
 				end
 			end)
 
-			local UserInputService = game:GetService("UserInputService")
-			local TweenService = game:GetService("TweenService")
-			local RunService = game:GetService("RunService")
+			-- Bug Fix: Redundante Service-Deklarationen entfernt (nutze Modul-Level Vars)
 
 			local linkDragging = false
 			local originalPosition = UDim2.new(0.5, 0,0, 0)
@@ -11454,7 +11453,7 @@ local function applyMinihomeInfoTransparency()
 				end)
 			end)
 
-			UserInputService.InputEnded:Connect(function(input)
+			syde:AddConnection(userinput.InputEnded, function(input) -- Bug Fix: syde:AddConnection
 				if input.UserInputType == Enum.UserInputType.MouseButton1 and linkDragging then
 					linkDragging = false
 					local foundTarget = false
@@ -11469,24 +11468,22 @@ local function applyMinihomeInfoTransparency()
 									Content = 'Color Linked',
 									Duration = 2,
 								})
-								TweenService:Create(
+								tweenservice:Create(
 									colorpicker.HueValues.Link.Frame,
 									TweenInfo.new(0.3, Enum.EasingStyle.Quint),
 									{ Position = originalPosition }
 								):Play()
 
-								TweenService:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
-								--	TweenService:Create(colorpicker.HueValues.HEX.Link, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {ImageColor3 = Color3.fromRGB(66, 66, 66)}):Play()
-								TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {Size = UDim2.new(1, 0,1, 0)}):Play()
+								tweenservice:Create(otherPicker.UIStroke, TweenInfo.new(0.6, Enum.EasingStyle.Exponential), {Transparency = 1}):Play()
+								tweenservice:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {Size = UDim2.new(1, 0,1, 0)}):Play()
 								break
 							end
 						end
 					end
 
 					if not foundTarget then
-						--	TweenService:Create(colorpicker.HueValues.HEX.Link, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {ImageColor3 = Color3.fromRGB(66, 66, 66)}):Play()
-						TweenService:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {Size = UDim2.new(1, 0,1, 0)}):Play()
-						TweenService:Create(
+						tweenservice:Create(colorpicker.HueValues.Link.Frame, TweenInfo.new(0.5, Enum.EasingStyle.Exponential) , {Size = UDim2.new(1, 0,1, 0)}):Play()
+						tweenservice:Create(
 							colorpicker.HueValues.Link.Frame,
 							TweenInfo.new(0.3, Enum.EasingStyle.Quint),
 							{ Position = originalPosition }
