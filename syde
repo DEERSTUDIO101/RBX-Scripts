@@ -4392,9 +4392,11 @@ local function applyMinihomeInfoTransparency()
 				if data.Type == 'Default' then
 					-- UI Stroke effect on button press
 
-					button.interact.MouseButton1Down:Connect(function()
-						tweenOrSet(button.UIStroke, fOTween, { Transparency = 1 })
-						tweenOrSet(button.ImageLabel, fOTween, { ImageTransparency = 1 })
+					button.interact.InputBegan:Connect(function(input)
+						if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+							tweenOrSet(button.UIStroke, fOTween, { Transparency = 1 })
+							tweenOrSet(button.ImageLabel, fOTween, { ImageTransparency = 1 })
+						end
 					end)
 
 					button.interact.MouseButton1Up:Connect(function()
@@ -8006,6 +8008,14 @@ local function applyMinihomeInfoTransparency()
 		if tabTitle then tabTitle.Text = tdata.Title end
 		Tab.Name = tdata.Title
 
+		if tab.Icon then
+			local iconLabel = Tab:FindFirstChild("icon") or Tab:FindFirstChild("ImageLabel")
+			if iconLabel then
+				iconLabel.Image = (tonumber(tab.Icon) and "rbxassetid://" .. tab.Icon) or tab.Icon
+				iconLabel.Visible = true
+			end
+		end
+
 		if tabTitle then tabTitle.TextTransparency = 1 end
 		local indicator = syde:getMember(Tab, "indicator")
 		if indicator then indicator.BackgroundTransparency = 1 end
@@ -9287,8 +9297,10 @@ local function applyMinihomeInfoTransparency()
 				end
 				-- Bug Fix: UpdateSlider() ohne Argument entfernt (dragging=false, hätte nichts getan)
 
-				Slider.slide.Interact.MouseButton1Down:Connect(function()
-					dragging = true
+				Slider.slide.Interact.InputBegan:Connect(function(input)
+					if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+						dragging = true
+					end
 				end)
 
 				Slider.slide.Interact.MouseButton1Up:Connect(function()
