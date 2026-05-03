@@ -214,6 +214,11 @@ local syde = {
 	Flags = {};
 	SettingsFlags = {};
 	UIAnimationsEnabled = true;
+
+	-- Compatibility dummy methods to prevent "missing method" errors
+	dprint = function() end;
+	DebugPrint = function() end;
+	_Debug = function() end;
 };
 
 -- @Utilities
@@ -1508,7 +1513,7 @@ do
 					task.wait(0.5)
 					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Styles[platform].BackGroundColor}):Play()
 					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0.5}):Play()
-					print(value)
+
 				else
 					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Color = Color3.fromRGB(255, 41, 45)}):Play()
 					tweenservice:Create(clone.Frame.UIStroke, TweenInfo.new(0.5, Enum.EasingStyle.Quart), {Transparency = 0}):Play()
@@ -1673,7 +1678,7 @@ do
 						makefolder(discordFolder)
 					end)
 					if folderSuccess then
-						print("[SYDE] Created DiscordInvites folder at:", discordFolder)
+
 					else
 						warn("[SYDE] Failed to create DiscordInvites folder:", folderErr)
 					end
@@ -1681,7 +1686,7 @@ do
 
 				local shouldPrompt = true
 				if isfile and discordConfig.RememberJoins and isfile(inviteFilePath) then
-					print("[SYDE] Discord invite '" .. inviteCode .. "' already joined. Skipping prompt.")
+
 					shouldPrompt = false
 				end
 
@@ -1706,7 +1711,7 @@ do
 						end)
 
 						if reqSuccess then
-							print("[SYDE] Discord invite sent successfully to:", inviteCode)
+
 						else
 							warn("[SYDE] Failed to send Discord invite:", reqErr)
 						end
@@ -1720,7 +1725,7 @@ do
 						end)
 
 						if writeSuccess then
-							print("[SYDE] Logged Discord invite join for:", inviteCode)
+
 						else
 							warn("[SYDE] Failed to write join log for invite:", writeErr)
 						end
@@ -1829,7 +1834,7 @@ function LoadConfig(Configuration)
 			end
 		end
 
-		print("Loading Flag:", FlagName, "Value:", SavedValue)
+
 	end
 
 	return changed
@@ -3142,12 +3147,12 @@ function ToggleUI()
 	end
 
 	if uiclosed then
-		print('open')
+
 		openui()
 		updateLayout()
 	else
 		closeui()
-		print('close')
+
 	end
 	-- Bug Fix: ViewportSize/TouchEnabled Connections werden nur einmalig registriert (nicht bei jedem openui-Aufruf)
 
@@ -3765,7 +3770,7 @@ local function applyMinihomeInfoTransparency()
 		layout:Bind()
 		layout:Update()
 
-		print("LATENCY SCRIPT RUNNING")
+
 
 		local Stats = game:GetService("Stats")
 		local TweenService = game:GetService("TweenService")
@@ -3948,7 +3953,7 @@ local function applyMinihomeInfoTransparency()
 
 				local ping = getPing()
 				-- replace with getPing() when ready
-				print(ping)
+
 
 				table.insert(history,ping)
 
@@ -6775,7 +6780,7 @@ local function applyMinihomeInfoTransparency()
 			Key = uitoggle,
 			OnKeyChanged = function(newKey)
 				uitoggle = newKey
-				print(newKey)
+
 			end,
 			CallBack = function()
 				ToggleUI()
@@ -7032,7 +7037,7 @@ local function applyMinihomeInfoTransparency()
 					StarterValue = dragSpeed,
 					CallBack = function(v)
 						dragSpeed = v
-						print(dragSpeed)
+
 					end,
 					SFlag = 'DSmoothness',
 					SettingConfig = true
@@ -11700,7 +11705,7 @@ local function applyMinihomeInfoTransparency()
 						Content = 'Loaded Save File';
 						Duration = 3
 					})
-					print("Configuration loaded successfully from a previous session.")
+
 				else
 					-- Bug Fix: 'elseif not success' war redundant (success ist bereits false)
 					warn("[SYDE] Configurations Error " .. tostring(result))
