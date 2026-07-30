@@ -1,0 +1,2075 @@
+local OceanUI = loadstring(game:HttpGet("https://raw.githubusercontent.com/Snipez-Dev/Ocean/refs/heads/main/OCEUI6"))()
+
+
+
+local Window = OceanUI:CreateWindow({
+	Title = "Ocean Hub",
+})
+
+Window:CreateTag("Universal", Color3.fromRGB(80, 150, 255), Color3.fromRGB(220, 240, 255))
+Window:CreateTag("v1.0.0",    Color3.fromRGB(50,  50,  50), Color3.fromRGB(200, 200, 200))
+
+Window:Notify({ Title="Ocean Hub", Text="Loaded!", Icon="check", Duration=4 })
+
+-- Services
+local game             = game
+local workspace        = workspace
+local Players          = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local RunService       = game:GetService("RunService")
+local UIS              = game:GetService("UserInputService")
+local TS               = game:GetService("TeleportService")
+local LP               = Players.LocalPlayer
+
+-- Localized Roblox Functions & Types to speed up execution inside high-frequency loops (especially when obfuscated)
+local Vector3_zero     = Vector3.zero
+local Vector3_new      = Vector3.new
+local Vector2_new      = Vector2.new
+local CFrame_new       = CFrame.new
+local Color3_new       = Color3.new
+local Color3_fromRGB   = Color3.fromRGB
+local Instance_new     = Instance.new
+local math_floor       = math.floor
+local ipairs           = ipairs
+local pairs            = pairs
+local pcall            = pcall
+local select           = select
+
+-- Persistent state via getgenv (no 200-locals limit)
+getgenv().OH = getgenv().OH or {}
+local S = getgenv().OH
+
+getgenv().ohToggles = {}
+local Toggles = getgenv().ohToggles
+
+S.noclip  = false
+S.infJump = false
+S.antiSit = false
+S.antiHouseBan = false
+S.antiFling = false
+S.fly     = false
+S.flyBV   = nil
+S.flyBG   = nil
+S.flyConn = nil
+
+-- Freecam State
+S.freecamSpeed = 5
+S.freecamSmoothness = 0.2
+S.freecamActive = false
+S.freecamPart = nil
+S.freecamMoveDir = Instance_new("CFrameValue")
+S.freecamConn = nil
+S.freecamInputBegin = nil
+S.freecamInputEnd = nil
+
+-- Spectate State
+S.spectateTarget = nil
+S.spectateConn   = nil
+
+
+-- ESP flags
+S.nameESP    = false
+S.boneESP    = false
+S.snapESP    = false
+S.distESP    = false
+S.boxESP     = false
+S.healthESP  = false
+S.chamsESP   = false
+S.toolESP    = false
+S.espColor   = Color3_fromRGB(64, 224, 208)
+
+-- Clean up old connections on re-exec
+for _, c in pairs(S.conns or {}) do pcall(function() c:Disconnect() end) end
+S.conns = {}
+
+local function getChar()  return LP.Character end
+local function getHum()   local c=getChar(); return c and c:FindFirstChildOfClass("Humanoid") end
+local function getRoot()  local c=getChar(); return c and c:FindFirstChild("HumanoidRootPart") end
+local function notify(t,x,i) Window:Notify({Title=t, Text=x, Icon=i or "info", Duration=3}) end
+
+local function getPlayerNames()
+	local names = {}
+	for _, plr in pairs(Players:GetPlayers()) do
+		if plr ~= LP then table.insert(names, plr.Name) end
+	end
+	return #names > 0 and names or {"— nobody —"}
+end
+
+-- Custom Game Tabs (Always at the very top, above Local)
+local BrookhavenTab
+local bhDrop
+if game.PlaceId == 4924922222 then
+	BrookhavenTab = Window:AddTab("Brookhaven", "building-2")
+end
+
+-- Tabs
+local LocalTab   = Window:AddTab("Local",    "zap")
+local ESPTab     = Window:AddTab("ESP",      "eye")
+local KeybindsTab= Window:AddTab("Keybinds", "keyboard")
+local SUSTab     = Window:AddTab("SUS",      "heart")
+local ScriptTab  = Window:AddTab("Scripts",  "code")
+local ServerTab  = Window:AddTab("Server",   "server")
+local SettingsTab= Window:AddTab("Settings", "settings")
+
+
+-- ════════════════════════════════════════════════════════
+-- LOCAL
+-- ════════════════════════════════════════════════════════
+do
+	LocalTab:AddLabel("Movement", "activity")
+	LocalTab:AddSeparator()
+
+	LocalTab:AddSlider({
+		Title    = "WalkSpeed",
+		Icon     = "move",
+		Min      = 16,
+		Max      = 300,
+		Default  = 16,
+		Callback = function(v)
+			local h = getHum(); if h then h.WalkSpeed = v end
+		end,
+	})
+
+	LocalTab:AddSlider({
+		Title    = "JumpPower",
+		Icon     = "arrow-up",
+		Min      = 50,
+		Max      = 500,
+		Default  = 50,
+		Callback = function(v)
+			local h = getHum()
+			if h then h.JumpPower = v; h.JumpHeight = v / 4 end
+		end,
+	})
+
+	LocalTab:AddSeparator()
+	LocalTab:AddLabel("Abilities", "zap")
+	LocalTab:AddSeparator()
+
+	Toggles.Noclip = LocalTab:AddToggle({
+		Title    = "Noclip",
+		Subtitle = "Walk through walls",
+		Icon     = "box",
+		Default  = false,
+		Callback = function(on)
+			S.noclip = on
+			if not on then
+				local c = getChar()
+				if c then for _,p in pairs(c:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=true end end end
+			end
+			notify("Noclip", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	table.insert(S.conns, RunService.Stepped:Connect(function()
+		if not S.noclip then return end
+		local c = getChar(); if not c then return end
+		for _,p in pairs(c:GetDescendants()) do if p:IsA("BasePart") then p.CanCollide=false end end
+	end))
+
+	Toggles.InfJump = LocalTab:AddToggle({
+		Title    = "Infinite Jump",
+		Subtitle = "Jump without limits",
+		Icon     = "chevrons-up",
+		Default  = false,
+		Callback = function(on)
+			S.infJump = on
+			notify("Infinite Jump", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	table.insert(S.conns, UIS.JumpRequest:Connect(function()
+		if not S.infJump then return end
+		local h = getHum(); if h then h:ChangeState(Enum.HumanoidStateType.Jumping) end
+	end))
+
+	Toggles.AntiFling = LocalTab:AddToggle({
+		Title    = "Anti Fling",
+		Subtitle = "Disables collisions with other players to prevent fling",
+		Icon     = "shield-alert",
+		Default  = false,
+		Callback = function(on)
+			S.antiFling = on
+			notify("Anti Fling", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	table.insert(S.conns, RunService.Stepped:Connect(function()
+		if not S.antiFling then return end
+		local char = getChar()
+		if char then
+			for _, p in pairs(char:GetDescendants()) do
+				if p:IsA("BasePart") then
+					p.CanCollide = false
+				end
+			end
+			-- Disable collision for other players' characters on the client
+			for _, player in pairs(Players:GetPlayers()) do
+				if player ~= LP then
+					local oChar = player.Character
+					if oChar then
+						for _, p in pairs(oChar:GetDescendants()) do
+							if p:IsA("BasePart") then
+								p.CanCollide = false
+								p.Velocity = Vector3_zero
+								p.RotVelocity = Vector3_zero
+							end
+						end
+					end
+				end
+			end
+		end
+	end))
+
+	if game.PlaceId == 4924922222 and BrookhavenTab then
+		BrookhavenTab:AddLabel("Abuse / Kill", "skull")
+		BrookhavenTab:AddSeparator()
+
+		local bhTarget = nil
+		bhDrop = BrookhavenTab:AddDropdown({
+			Title    = "Select Target",
+			Icon     = "user",
+			Options  = getPlayerNames(),
+			Default  = 1,
+			Callback = function(name) bhTarget = Players:FindFirstChild(name) end,
+		})
+		bhTarget = Players:FindFirstChild(getPlayerNames()[1] or "")
+
+		local function findCouchTool()
+			for _, tool in ipairs(LP.Backpack:GetChildren()) do
+				if tool:IsA("Tool") and (tool.Name:lower():find("couch") or tool.Name:lower():find("sofa")) then
+					return tool
+				end
+			end
+			for _, tool in ipairs(LP.Character:GetChildren()) do
+				if tool:IsA("Tool") and (tool.Name:lower():find("couch") or tool.Name:lower():find("sofa")) then
+					return tool
+				end
+			end
+			return nil
+		end
+
+		local function autoGetCouchTool()
+			local existing = findCouchTool()
+			if existing then return existing end
+
+			local cgt = workspace:FindFirstChild("WorkspaceCom") and workspace.WorkspaceCom:FindFirstChild("003_CouchGiveTool")
+			if not cgt then return nil end
+			local seat = cgt:FindFirstChildOfClass("Seat")
+			if not seat then return nil end
+
+			local myRoot = getRoot()
+			local myHum  = getHum()
+			if not myRoot or not myHum then return nil end
+
+			local origCF     = myRoot.CFrame
+			local wasAntiSit = S.antiSit
+
+			S.antiSit = false
+			myHum:SetStateEnabled(Enum.HumanoidStateType.Seated, true)
+
+			myRoot.CFrame = seat.CFrame * CFrame.new(0, 3, 0)
+			task.wait(0.15)
+			seat:Sit(myHum)
+
+			local tool = nil
+			for _ = 1, 25 do
+				task.wait(0.1)
+				tool = findCouchTool()
+				if tool then break end
+			end
+
+			myHum.Sit = false
+			task.wait(0.15)
+			myRoot.CFrame = origCF
+
+			S.antiSit = wasAntiSit
+			if wasAntiSit then
+				myHum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+			end
+
+			return tool
+		end
+
+		local function flyTeleport(targetCF)
+			local myChar = getChar()
+			local myRoot = getRoot()
+			local myHum  = getHum()
+			if not myChar or not myRoot or not myHum then return end
+
+			local startCF = myRoot.CFrame
+			local distance = (targetCF.Position - startCF.Position).Magnitude
+			
+			-- Move in steps of max 40 studs to allow perfect replication of seated player
+			local stepDist = 40
+			local steps = math.max(1, math.ceil(distance / stepDist))
+			
+			local wasPlatformStand = myHum.PlatformStand
+			myHum.PlatformStand = true
+			
+			for i = 1, steps do
+				local alpha = i / steps
+				local nextCF = startCF:lerp(targetCF, alpha)
+				
+				-- Zero out all assembly velocities to keep everything stable and welded
+				for _, p in ipairs(myChar:GetChildren()) do
+					if p:IsA("BasePart") then
+						p.AssemblyLinearVelocity = Vector3.zero
+						p.AssemblyAngularVelocity = Vector3.zero
+					end
+				end
+				
+				myRoot.CFrame = nextCF
+				RunService.Heartbeat:Wait()
+			end
+			
+			myRoot.CFrame = targetCF
+			myHum.PlatformStand = wasPlatformStand
+		end
+
+		BrookhavenTab:AddButton({
+			Title    = "Couch Kill",
+			Subtitle = "Spawns couch, sits player in it, drops them to void, and teleports you back",
+			Icon     = "skull",
+			Text     = "Kill",
+			Callback = function()
+				if not bhTarget then notify("Couch Kill", "No player selected", "x"); return end
+				local myChar = getChar()
+				local myRoot = getRoot()
+				local myHum  = getHum()
+				local targetRoot = bhTarget.Character and bhTarget.Character:FindFirstChild("HumanoidRootPart")
+				local targetHum  = bhTarget.Character and bhTarget.Character:FindFirstChildOfClass("Humanoid")
+				
+				if not myChar or not myRoot or not myHum then
+					notify("Couch Kill", "Local character not ready", "x")
+					return
+				end
+				if not targetRoot or not targetHum then
+					notify("Couch Kill", "Target character not ready", "x")
+					return
+				end
+				
+				notify("Couch Kill", "Couch wird geholt...", "info")
+				local couchTool = autoGetCouchTool()
+				if not couchTool then
+					notify("Couch Kill", "Couch konnte nicht gefunden werden!", "x")
+					return
+				end
+				
+				local origCF = myRoot.CFrame
+				
+				-- Temporarily turn off Anti Fling to allow target connection
+				local wasAntiFling = S.antiFling
+				S.antiFling = false
+				
+				-- Teleport to the target with a slight offset behind and tilted forward by 50 degrees
+				notify("Couch Kill", "Teleporting behind " .. bhTarget.Name, "info")
+				
+				local arrived = false
+				for i = 1, 12 do
+					myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 2.9) * CFrame.Angles(math.rad(-50), 0, 0)
+					task.wait(0.04)
+					if (myRoot.Position - targetRoot.Position).Magnitude < 10 then
+						arrived = true
+						break
+					end
+				end
+				
+				if not arrived then
+					notify("Couch Kill", "Failed to reach target!", "x")
+					S.antiFling = wasAntiFling
+					return
+				end
+				
+				-- Now equip the couch tool since we are confirmed to be at the target
+				if couchTool.Parent == LP.Backpack then
+					myHum:EquipTool(couchTool)
+				end
+				task.wait(0.15)
+				
+				-- Detect small skin: HRP significantly below normal standing height
+				local targetScale = 1
+				local sizeVal = targetHum:FindFirstChild("BodyDepthScale") or targetHum:FindFirstChild("HeadScale")
+				if sizeVal and sizeVal.Value < 0.85 then targetScale = sizeVal.Value end
+				local isSmall = targetScale < 0.85
+
+				local sat = false
+				for i = 1, 100 do
+					if targetHum.Sit or targetHum.SeatPart then
+						sat = true
+						for _ = 1, 10 do
+							if targetRoot then
+								myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 2.9) * CFrame.Angles(math.rad(-50), 0, 0)
+							end
+							task.wait(0.025)
+						end
+						break
+					end
+
+					local angle = i * 11
+					local rad   = math.rad(angle)
+					-- Smaller skin → try shorter distances and lower Y offsets
+					local baseDist = isSmall and 1.2 or 1.6
+					local dist     = baseDist + (i % 6) * 0.35   -- 1.2–2.9 (small) or 1.6–3.35 (normal)
+					local xOffset  = math.sin(rad) * dist
+					local zOffset  = (isSmall and 1.8 or 2.3) + math.cos(rad) * 0.8
+					-- Small skins: sweep Y from -2 to +0.5 to hit their lower HRP
+					local yPhase   = math.sin(math.rad(i * 37))
+					local yOffset  = isSmall and (yPhase * 1.5 - 0.8) or (yPhase * 0.5)
+					-- Small skins: flatter tilt so seat goes down, not forward
+					local tilt     = isSmall and (-20 - (i % 5) * 10) or (-35 - (i % 4) * 12)
+					myRoot.CFrame = targetRoot.CFrame
+						* CFrame.new(xOffset, yOffset, zOffset)
+						* CFrame.Angles(math.rad(tilt), 0, 0)
+					task.wait(0.02)
+				end
+
+				if sat then
+					flyTeleport(CFrame.new(0, -900, 0))
+					task.wait(0.25)
+
+					-- Disable seat & welds, unequip first to remove couch from workspace
+					for _, v in ipairs(couchTool:GetDescendants()) do
+						if v:IsA("Seat") or v:IsA("VehicleSeat") then v.Disabled = true end
+						if v:IsA("Weld") or v:IsA("ManualWeld") or v:IsA("WeldConstraint") or v:IsA("Snap") then v:Destroy() end
+					end
+					if myHum.SeatPart then myHum.Sit = false end
+					myHum:UnequipTools()
+					task.wait(0.1)
+					for _, child in ipairs(myChar:GetDescendants()) do
+						if child:IsA("Weld") or child:IsA("ManualWeld") or child:IsA("WeldConstraint") or child.Name:find("Weld") then
+							child:Destroy()
+						end
+					end
+
+					-- Heartbeat-Lock: fight any server/client void-push by reasserting origCF every frame
+					myRoot.AssemblyLinearVelocity  = Vector3.zero
+					myRoot.AssemblyAngularVelocity = Vector3.zero
+					myRoot.CFrame = origCF
+
+					local lockActive = true
+					local lockConn
+					lockConn = RunService.Heartbeat:Connect(function()
+						if not lockActive then lockConn:Disconnect(); return end
+						local dist = (myRoot.Position - origCF.Position).Magnitude
+						if dist > 5 then
+							myRoot.CFrame = origCF
+							myRoot.AssemblyLinearVelocity  = Vector3.zero
+							myRoot.AssemblyAngularVelocity = Vector3.zero
+						end
+					end)
+					task.delay(2.5, function()
+						lockActive = false
+					end)
+
+					myHum.PlatformStand = false
+					S.antiFling = wasAntiFling
+					notify("Couch Kill", "Target dropped!", "check")
+				else
+					myHum:UnequipTools()
+					myRoot.CFrame = origCF
+					S.antiFling = wasAntiFling
+					notify("Couch Kill", "Failed to catch target!", "x")
+				end
+			end,
+		})
+
+		BrookhavenTab:AddButton({
+			Title    = "Couch Bring",
+			Subtitle = "Catches the selected player and brings them to your current position",
+			Icon     = "user-plus",
+			Text     = "Bring",
+			Callback = function()
+				if not bhTarget then notify("Couch Bring", "No player selected", "x"); return end
+				local myChar = getChar()
+				local myRoot = getRoot()
+				local myHum  = getHum()
+				local targetRoot = bhTarget.Character and bhTarget.Character:FindFirstChild("HumanoidRootPart")
+				local targetHum  = bhTarget.Character and bhTarget.Character:FindFirstChildOfClass("Humanoid")
+				
+				if not myChar or not myRoot or not myHum then
+					notify("Couch Bring", "Local character not ready", "x")
+					return
+				end
+				if not targetRoot or not targetHum then
+					notify("Couch Bring", "Target character not ready", "x")
+					return
+				end
+				
+				notify("Couch Bring", "Couch wird geholt...", "info")
+				local couchTool = autoGetCouchTool()
+				if not couchTool then
+					notify("Couch Bring", "Couch konnte nicht gefunden werden!", "x")
+					return
+				end
+				
+				local origCF = myRoot.CFrame
+				
+				-- Temporarily turn off Anti Fling to allow target connection
+				local wasAntiFling = S.antiFling
+				S.antiFling = false
+				
+				notify("Couch Bring", "Teleporting behind " .. bhTarget.Name, "info")
+				
+				local arrived = false
+				for i = 1, 12 do
+					myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 2.9) * CFrame.Angles(math.rad(-50), 0, 0)
+					task.wait(0.04)
+					if (myRoot.Position - targetRoot.Position).Magnitude < 10 then
+						arrived = true
+						break
+					end
+				end
+				
+				if not arrived then
+					notify("Couch Bring", "Failed to reach target!", "x")
+					S.antiFling = wasAntiFling
+					return
+				end
+				
+				if couchTool.Parent == LP.Backpack then
+					myHum:EquipTool(couchTool)
+				end
+				task.wait(0.15)
+				
+				local targetScale2 = 1
+				local sizeVal2 = targetHum:FindFirstChild("BodyDepthScale") or targetHum:FindFirstChild("HeadScale")
+				if sizeVal2 and sizeVal2.Value < 0.85 then targetScale2 = sizeVal2.Value end
+				local isSmall2 = targetScale2 < 0.85
+
+				local sat = false
+				for i = 1, 100 do
+					if targetHum.Sit or targetHum.SeatPart then
+						sat = true
+						for _ = 1, 10 do
+							if targetRoot then
+								myRoot.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 2.9) * CFrame.Angles(math.rad(-50), 0, 0)
+							end
+							task.wait(0.025)
+						end
+						break
+					end
+					local angle    = i * 11
+					local rad      = math.rad(angle)
+					local baseDist = isSmall2 and 1.2 or 1.6
+					local dist     = baseDist + (i % 6) * 0.35
+					local xOffset  = math.sin(rad) * dist
+					local zOffset  = (isSmall2 and 1.8 or 2.3) + math.cos(rad) * 0.8
+					local yPhase   = math.sin(math.rad(i * 37))
+					local yOffset  = isSmall2 and (yPhase * 1.5 - 0.8) or (yPhase * 0.5)
+					local tilt     = isSmall2 and (-20 - (i % 5) * 10) or (-35 - (i % 4) * 12)
+					myRoot.CFrame = targetRoot.CFrame
+						* CFrame.new(xOffset, yOffset, zOffset)
+						* CFrame.Angles(math.rad(tilt), 0, 0)
+					task.wait(0.02)
+				end
+
+				if sat then
+					notify("Couch Bring", "Player seated! Bringing to you...", "info")
+					flyTeleport(origCF)
+					task.wait(0.2)
+
+					for _, v in ipairs(couchTool:GetDescendants()) do
+						if v:IsA("Seat") or v:IsA("VehicleSeat") then v.Disabled = true end
+						if v:IsA("Weld") or v:IsA("ManualWeld") or v:IsA("WeldConstraint") or v:IsA("Snap") then v:Destroy() end
+					end
+					if myHum.SeatPart then myHum.Sit = false end
+					myHum:UnequipTools()
+					task.wait(0.15)
+
+					for _, child in ipairs(myChar:GetDescendants()) do
+						if child:IsA("Weld") or child:IsA("ManualWeld") or child:IsA("WeldConstraint") or child.Name:find("Weld") then
+							child:Destroy()
+						end
+					end
+
+					myRoot.AssemblyLinearVelocity  = Vector3.zero
+					myRoot.AssemblyAngularVelocity = Vector3.zero
+					myHum.PlatformStand = false
+
+					S.antiFling = wasAntiFling
+					notify("Couch Bring", "Target brought successfully!", "check")
+				else
+					-- Teleport back home immediately since they didn't sit, no bring needed
+					myHum:UnequipTools()
+					myRoot.CFrame = origCF
+					S.antiFling = wasAntiFling
+					notify("Couch Bring", "Failed to catch target!", "x")
+				end
+			end,
+		})
+
+		BrookhavenTab:AddSeparator()
+		BrookhavenTab:AddLabel("Protections", "shield")
+		BrookhavenTab:AddSeparator()
+
+		Toggles.AntiSit = BrookhavenTab:AddToggle({
+			Title    = "Anti Sit",
+			Subtitle = "Prevents sitting on chairs and vehicles",
+			Icon     = "user-minus",
+			Default  = false,
+			Callback = function(on)
+				S.antiSit = on
+				local h = getHum()
+				if h then
+					h:SetStateEnabled(Enum.HumanoidStateType.Seated, not on)
+					if on and h.Sit then
+						h.Sit = false
+					end
+				end
+				notify("Anti Sit", on and "Enabled" or "Disabled", on and "check" or "x")
+			end,
+		})
+
+		table.insert(S.conns, LP.CharacterAdded:Connect(function(char)
+			local hum = char:WaitForChild("Humanoid", 5)
+			if hum and S.antiSit then
+				hum:SetStateEnabled(Enum.HumanoidStateType.Seated, false)
+			end
+		end))
+
+		-- Setup PropertyPermissions Hook
+		local PropertyPermissions = ReplicatedStorage:FindFirstChild("Modules") 
+			and ReplicatedStorage.Modules:FindFirstChild("Client") 
+			and ReplicatedStorage.Modules.Client:FindFirstChild("Components")
+			and ReplicatedStorage.Modules.Client.Components:FindFirstChild("Housing")
+			and ReplicatedStorage.Modules.Client.Components.Housing:FindFirstChild("PropertyPermissions")
+			and require(ReplicatedStorage.Modules.Client.Components.Housing.PropertyPermissions)
+		local originalDisallow = PropertyPermissions and PropertyPermissions.Disallow
+
+		Toggles.AntiHouseBan = BrookhavenTab:AddToggle({
+			Title    = "Anti House Ban",
+			Subtitle = "Allows you to enter banned houses",
+			Icon     = "home",
+			Default  = false,
+			Callback = function(on)
+				S.antiHouseBan = on
+				notify("Anti House Ban", on and "Enabled" or "Disabled", on and "check" or "x")
+				if on then
+					if PropertyPermissions then
+						PropertyPermissions.Disallow = function() end
+					end
+					for _, d in ipairs(workspace:GetDescendants()) do
+						if (d.Name == "BannedBlock" or d.Name:find("BannedBlock")) and d:IsA("BasePart") then
+							d.CanCollide = false
+							d.CanTouch = false
+							d.Transparency = 1
+						end
+					end
+				else
+					if PropertyPermissions and originalDisallow then
+						PropertyPermissions.Disallow = originalDisallow
+					end
+				end
+			end,
+		})
+
+		table.insert(S.conns, workspace.DescendantAdded:Connect(function(d)
+			if S.antiHouseBan and (d.Name == "BannedBlock" or d.Name:find("BannedBlock")) and d:IsA("BasePart") then
+				d.CanCollide = false
+				d.CanTouch = false
+				d.Transparency = 1
+				task.spawn(function()
+					task.wait(0.1)
+					d.CanCollide = false
+					d.CanTouch = false
+				end)
+			end
+		end))
+	end
+
+	-- ─── LERP FLIGHT SYSTEM (Open Gui.lua style) ───────────────────────
+	local flyPart = nil
+	local flyMoveDir = Instance.new("CFrameValue")
+	local flySpeed = 10
+	local flySmoothness = 0.2
+
+	LocalTab:AddSlider({
+		Title    = "Fly Speed",
+		Icon     = "gauge",
+		Min      = 10,
+		Max      = 300,
+		Default  = 10,
+		Callback = function(v) flySpeed = v end
+	})
+
+	Toggles.Fly = LocalTab:AddToggle({
+		Title    = "Fly",
+		Subtitle = "WASD + Space/LCtrl to fly (Smooth)",
+		Icon     = "wind",
+		Default  = false,
+		Callback = function(on)
+			S.fly = on
+			local c = getChar()
+			local root = getRoot()
+			local hum = getHum()
+
+			if on and c and root and hum then
+				-- Setup anchored fly reference part
+				flyPart = flyPart or Instance.new("Part")
+				flyPart.Size = Vector3.new(1, 1, 1)
+				flyPart.Transparency = 1
+				flyPart.Anchored = true
+				flyPart.CanCollide = false
+				flyPart.CFrame = root.CFrame
+				flyMoveDir.Value = CFrame.new(0, 0, 0)
+				hum.PlatformStand = true
+
+				S.flyConn = RunService.Heartbeat:Connect(function()
+					if not S.fly or not c or not c.Parent or not root or not hum then
+						if S.flyConn then S.flyConn:Disconnect() S.flyConn = nil end
+						if hum then hum.PlatformStand = false end
+						return
+					end
+
+					local cam = workspace.CurrentCamera
+					local x, y, z = 0, 0, 0
+
+					if UIS:IsKeyDown(Enum.KeyCode.W) then z = -1 * flySpeed end
+					if UIS:IsKeyDown(Enum.KeyCode.S) then z = 1 * flySpeed end
+					if UIS:IsKeyDown(Enum.KeyCode.A) then x = -1 * flySpeed end
+					if UIS:IsKeyDown(Enum.KeyCode.D) then x = 1 * flySpeed end
+					if UIS:IsKeyDown(Enum.KeyCode.Space) then y = 1 * flySpeed end
+					if UIS:IsKeyDown(Enum.KeyCode.LeftControl) then y = -1 * flySpeed end
+
+					-- Point part towards camera view
+					flyPart.CFrame = CFrame.new(
+						flyPart.CFrame.Position,
+						(cam.CFrame * CFrame.new(0, 0, -2048)).Position
+					)
+
+					-- Zero out velocities to prevent gravity drop/physics lag
+					for _, p in ipairs(c:GetChildren()) do
+						if p:IsA("BasePart") then
+							p.AssemblyLinearVelocity = Vector3.zero
+							p.AssemblyAngularVelocity = Vector3.zero
+						end
+					end
+
+					-- Interpolate direction for incredible smoothness
+					local targetDir = CFrame.new(x, y, z)
+					flyMoveDir.Value = flyMoveDir.Value:lerp(targetDir, flySmoothness)
+					
+					flyPart.CFrame = flyPart.CFrame:lerp(flyPart.CFrame * flyMoveDir.Value, flySmoothness)
+					root.CFrame = flyPart.CFrame
+					hum.PlatformStand = true
+				end)
+			else
+				if S.flyConn then S.flyConn:Disconnect() S.flyConn = nil end
+				if hum then hum.PlatformStand = false end
+				if c then
+					for _, p in ipairs(c:GetChildren()) do
+						if p:IsA("BasePart") then
+							p.AssemblyLinearVelocity = Vector3.zero
+							p.AssemblyAngularVelocity = Vector3.zero
+						end
+					end
+				end
+			end
+			notify("Fly", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	LocalTab:AddSeparator()
+	LocalTab:AddLabel("Freecam", "video")
+	LocalTab:AddSeparator()
+
+	LocalTab:AddSlider({
+		Title    = "Freecam Speed",
+		Icon     = "gauge",
+		Min      = 1,
+		Max      = 100,
+		Default  = 5,
+		Callback = function(v) S.freecamSpeed = v end
+	})
+
+	local freecamToggle
+	freecamToggle = LocalTab:AddToggle({
+		Title    = "Freecam",
+		Subtitle = "WASD + Q/E to fly camera (Smooth)",
+		Icon     = "camera",
+		Default  = false,
+		Callback = function(on)
+			S.freecamActive = on
+			local cam = workspace.CurrentCamera
+			local char = LP.Character
+			local root = getRoot()
+
+			local function flyEnd()
+				if S.freecamConn then S.freecamConn:Disconnect(); S.freecamConn = nil end
+				if S.freecamInputBegin then S.freecamInputBegin:Disconnect(); S.freecamInputBegin = nil end
+				if S.freecamInputEnd then S.freecamInputEnd:Disconnect(); S.freecamInputEnd = nil end
+
+				cam.CameraSubject = getHum() or char
+				pcall(function()
+					if root then root.Anchored = false end
+				end)
+			end
+
+			if not on then
+				flyEnd()
+				notify("Freecam", "Disabled", "x")
+				return
+			end
+
+			local dir = {w = false, a = false, s = false, d = false, q = false, e = false}
+			S.freecamMoveDir.Value = CFrame_new(0,0,0)
+
+			S.freecamPart = S.freecamPart or Instance_new("Part")
+			S.freecamPart.Transparency = 1
+			S.freecamPart.Anchored = true
+			S.freecamPart.CanCollide = false
+			S.freecamPart.Size = Vector3_new(1, 1, 1)
+			S.freecamPart.CFrame = cam.CFrame
+			pcall(function()
+				if root then root.Anchored = true end
+			end)
+
+			S.freecamConn = RunService.RenderStepped:Connect(function()
+				if not S.freecamActive or not cam or not S.freecamPart then
+					flyEnd()
+					if freecamToggle then freecamToggle:Set(false) end
+					return
+				end
+
+				local speed = S.freecamSpeed
+				local x, y, z = 0, 0, 0
+				if dir.w then z = -1 * speed end
+				if dir.a then x = -1 * speed end
+				if dir.s then z = 1 * speed end
+				if dir.d then x = 1 * speed end
+				if dir.q then y = -1 * speed end -- Down
+				if dir.e then y = 1 * speed end  -- Up
+
+				cam.CameraSubject = S.freecamPart
+
+				S.freecamPart.CFrame = CFrame_new(
+					S.freecamPart.CFrame.Position,
+					(cam.CFrame * CFrame_new(0, 0, -100)).Position
+				)
+
+				local moveDir = CFrame_new(x, y, z)
+				S.freecamMoveDir.Value = S.freecamMoveDir.Value:lerp(moveDir, S.freecamSmoothness)
+				S.freecamPart.CFrame = S.freecamPart.CFrame:lerp(S.freecamPart.CFrame * S.freecamMoveDir.Value, S.freecamSmoothness)
+			end)
+
+			S.freecamInputBegin = UIS.InputBegan:Connect(function(input, event)
+				if event then return end
+				local code, codes = input.KeyCode, Enum.KeyCode
+				if code == codes.W then
+					dir.w = true
+				elseif code == codes.A then
+					dir.a = true
+				elseif code == codes.S then
+					dir.s = true
+				elseif code == codes.D then
+					dir.d = true
+				elseif code == codes.Q then
+					dir.q = true
+				elseif code == codes.E then
+					dir.e = true
+				end
+			end)
+
+			S.freecamInputEnd = UIS.InputEnded:Connect(function(input, event)
+				if event then return end
+				local code, codes = input.KeyCode, Enum.KeyCode
+				if code == codes.W then
+					dir.w = false
+				elseif code == codes.A then
+					dir.a = false
+				elseif code == codes.S then
+					dir.s = false
+				elseif code == codes.D then
+					dir.d = false
+				elseif code == codes.Q then
+					dir.q = false
+				elseif code == codes.E then
+					dir.e = false
+				end
+			end)
+
+			notify("Freecam", "Enabled", "check")
+		end,
+	})
+
+	LocalTab:AddToggle({
+		Title    = "Anti-AFK",
+		Subtitle = "Prevent AFK kick",
+		Icon     = "shield",
+		Default  = false,
+		Callback = function(on)
+			if on then
+				local vu = LP:FindFirstChildOfClass("VirtualUser") or Instance.new("VirtualUser", LP)
+				LP.Idled:Connect(function() vu:CaptureController(); vu:ClickButton2(Vector2.new()) end)
+			end
+			notify("Anti-AFK", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+end
+
+-- ════════════════════════════════════════════════════════
+-- ESP
+-- Drawing.Transparency: 0 = fully opaque, 1 = invisible
+-- Cache: plr → { char, billboard, distLabel, bones[], snapLine }
+-- ════════════════════════════════════════════════════════
+do
+	-- Check Drawing API once and cache it in getgenv
+	local ohDrawOK = getgenv().ohDrawOK
+	local ohTextOK = getgenv().ohTextOK
+	if ohDrawOK == nil then
+		ohDrawOK = false
+		ohTextOK = false
+		pcall(function()
+			local ln = Drawing.new("Line")
+			ohDrawOK = true
+			pcall(function() ln:Remove() end)
+			pcall(function() ln:Destroy() end)
+		end)
+		if ohDrawOK then
+			pcall(function()
+				local tx = Drawing.new("Text")
+				ohTextOK = true
+				pcall(function() tx:Remove() end)
+				pcall(function() tx:Destroy() end)
+			end)
+		end
+		getgenv().ohDrawOK = ohDrawOK
+		getgenv().ohTextOK = ohTextOK
+	end
+
+	-- Clean up old cache on re-exec to prevent ghost drawings
+	if getgenv().ohESPCache then
+		for _, e in pairs(getgenv().ohESPCache) do
+			pcall(function() if e.billboard then e.billboard:Destroy() end end)
+			if e.bones then for _, b in ipairs(e.bones) do pcall(function() b.line:Remove() b.line:Destroy() end) end end
+			pcall(function() if e.snapLine then e.snapLine:Remove() e.snapLine:Destroy() end end)
+			pcall(function() if e.distLabel then e.distLabel:Remove() e.distLabel:Destroy() end end)
+			pcall(function() if e.nameLabel then e.nameLabel:Remove() e.nameLabel:Destroy() end end)
+			pcall(function() if e.toolLabel then e.toolLabel:Remove() e.toolLabel:Destroy() end end)
+			pcall(function() if e.highlight then e.highlight:Destroy() end end)
+			pcall(function() if e.box then e.box:Remove() e.box:Destroy() end end)
+			pcall(function() if e.healthBar then e.healthBar:Remove() e.healthBar:Destroy() end end)
+			pcall(function() if e.healthBg then e.healthBg:Remove() e.healthBg:Destroy() end end)
+		end
+	end
+	getgenv().ohESPCache = {}
+	local cache = getgenv().ohESPCache
+
+	local BONE_R6 = {
+		{"Head","Torso"},
+		{"Torso","Left Arm"},  {"Torso","Right Arm"},
+		{"Torso","Left Leg"},  {"Torso","Right Leg"},
+	}
+	local BONE_R15 = {
+		{"Head","UpperTorso"},
+		{"UpperTorso","LowerTorso"},
+		{"LowerTorso","LeftUpperLeg"},  {"LeftUpperLeg","LeftLowerLeg"},   {"LeftLowerLeg","LeftFoot"},
+		{"LowerTorso","RightUpperLeg"}, {"RightUpperLeg","RightLowerLeg"}, {"RightLowerLeg","RightFoot"},
+		{"UpperTorso","LeftUpperArm"},  {"LeftUpperArm","LeftLowerArm"},   {"LeftLowerArm","LeftHand"},
+		{"UpperTorso","RightUpperArm"}, {"RightUpperArm","RightLowerArm"}, {"RightLowerArm","RightHand"},
+	}
+
+	local function safeRemove(obj)
+		if not obj then return end
+		pcall(function() obj:Remove() end)
+		pcall(function() obj:Destroy() end)
+	end
+
+	local function newLine()
+		if not ohDrawOK then return nil end
+		local ok, ln = pcall(function()
+			local l = Drawing.new("Line")
+			l.Thickness    = 1.5
+			l.Color        = S.espColor
+			l.Transparency = 1.0 -- 1.0 is fully visible (opaque)
+			l.Visible      = false
+			return l
+		end)
+		return ok and ln or nil
+	end
+
+	local function newText()
+		if not ohTextOK then return nil end
+		local ok, t = pcall(function()
+			local tx = Drawing.new("Text")
+			tx.Size         = 13
+			tx.Color        = S.espColor
+			tx.Transparency = 1.0 -- 1.0 is fully visible (opaque)
+			tx.Outline      = true
+			tx.OutlineColor = Color3.new(0,0,0)
+			tx.Visible      = false
+			return tx
+		end)
+		return ok and t or nil
+	end
+
+	local function newSquare()
+		if not ohDrawOK then return nil end
+		local ok, sq = pcall(function()
+			local s = Drawing.new("Square")
+			s.Thickness    = 1.5
+			s.Color        = S.espColor
+			s.Transparency = 1.0
+			s.Filled       = false
+			s.Visible      = false
+			return s
+		end)
+		return ok and sq or nil
+	end
+
+	local function newCircle()
+		if not ohDrawOK then return nil end
+		local ok, ci = pcall(function()
+			local c = Drawing.new("Circle")
+			c.Thickness    = 1
+			c.Color        = S.espColor
+			c.Transparency = 1.0
+			c.Filled       = true
+			c.Visible      = false
+			return c
+		end)
+		return ok and ci or nil
+	end
+
+	local function removeCacheEntry(plr)
+		local e = cache[plr]; if not e then return end
+		pcall(function() if e.billboard then e.billboard:Destroy() end end)
+		if e.bones then for _, b in ipairs(e.bones) do safeRemove(b.line) end end
+		safeRemove(e.snapLine)
+		safeRemove(e.distLabel)
+		safeRemove(e.nameLabel)
+		safeRemove(e.toolLabel)
+		pcall(function() if e.highlight then e.highlight:Destroy() end end)
+		safeRemove(e.box)
+		safeRemove(e.healthBar)
+		safeRemove(e.healthBg)
+		cache[plr] = nil
+	end
+
+	local function buildCache(plr)
+		removeCacheEntry(plr)
+		local char = plr.Character; if not char then return end
+		local h    = char:FindFirstChildOfClass("Humanoid")
+		local isR6 = h and h.RigType == Enum.HumanoidRigType.R6
+		
+		local entry = { 
+			char = char, 
+			billboard = nil, 
+			billboardLabel = nil,
+			bones = {}, 
+			snapLine = nil, 
+			distLabel = nil, 
+			nameLabel = nil,
+			toolLabel = nil,
+			highlight = nil,
+			box = nil,
+			healthBar = nil,
+			healthBg = nil,
+			parts = {},
+			isR6 = isR6,
+			head = nil,
+			root = nil
+		}
+
+		-- Cache joint references to avoid calling FindFirstChild in the RenderStepped loop
+		local partNames = isR6 and {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg", "HumanoidRootPart"} or 
+		                  {"Head", "UpperTorso", "LowerTorso", 
+		                   "LeftUpperLeg", "LeftLowerLeg", "LeftFoot", 
+		                   "RightUpperLeg", "RightLowerLeg", "RightFoot", 
+		                   "LeftUpperArm", "LeftLowerArm", "LeftHand", 
+		                   "RightUpperArm", "RightLowerArm", "RightHand",
+		                   "HumanoidRootPart"}
+		
+		local parts = {}
+		for i = 1, #partNames do
+			local name = partNames[i]
+			parts[name] = char:FindFirstChild(name)
+		end
+		entry.parts = parts
+		entry.head  = parts["Head"]
+		entry.root  = parts["HumanoidRootPart"]
+
+		-- Name ESP
+		if S.nameESP then
+			if ohTextOK then
+				entry.nameLabel = newText()
+				if entry.nameLabel then
+					entry.nameLabel.Center = true
+					entry.nameLabel.Size = 16 -- Made a bit larger as requested
+				end
+			else
+				local bb  = Instance.new("BillboardGui")
+				bb.Name        = "OH_NameESP"
+				bb.Size        = UDim2.new(0, 120, 0, 20)
+				bb.StudsOffset = Vector3.new(0, 3.2, 0)
+				bb.AlwaysOnTop = true
+				bb.Adornee     = entry.head or entry.root or char.PrimaryPart
+				local lbl = Instance.new("TextLabel", bb)
+				lbl.Size                   = UDim2.new(1,0,1,0)
+				lbl.BackgroundTransparency = 1
+				lbl.Text                   = plr.Name
+				lbl.TextColor3             = S.espColor
+				lbl.Font                   = Enum.Font.GothamBold
+				lbl.TextSize               = 14 -- Made a bit larger as requested
+				lbl.TextStrokeTransparency = 0
+				lbl.TextStrokeColor3       = Color3.new(0,0,0)
+				
+				-- Safe parenting bypasses game character child-added checks
+				local parentSuccess = pcall(function()
+					bb.Parent = game:GetService("CoreGui") or LP:FindFirstChildOfClass("PlayerGui")
+				end)
+				if not parentSuccess then
+					pcall(function() bb.Parent = char end)
+				end
+				entry.billboard = bb
+				entry.billboardLabel = lbl
+			end
+		end
+
+		-- Bone lines
+		if S.boneESP and ohDrawOK then
+			for _, pair in ipairs(isR6 and BONE_R6 or BONE_R15) do
+				local ln = newLine()
+				if ln then
+					table.insert(entry.bones, { line=ln, from=pair[1], to=pair[2] })
+				end
+			end
+		end
+
+		-- Snap line
+		if S.snapESP and ohDrawOK then
+			entry.snapLine = newLine()
+			if entry.snapLine then entry.snapLine.Thickness = 1 end
+		end
+
+		-- Distance label
+		if S.distESP and ohDrawOK then
+			entry.distLabel = newText()
+			if entry.distLabel then
+				entry.distLabel.Size = 14 -- Made a bit larger as requested
+			end
+		end
+
+		-- Box ESP
+		if S.boxESP and ohDrawOK then
+			entry.box = newSquare()
+		end
+
+		-- Health ESP
+		if S.healthESP and ohDrawOK then
+			entry.healthBg = newLine()
+			if entry.healthBg then
+				entry.healthBg.Thickness = 2.5
+				entry.healthBg.Color = Color3_fromRGB(40, 40, 40)
+			end
+			entry.healthBar = newLine()
+			if entry.healthBar then
+				entry.healthBar.Thickness = 1.5
+			end
+		end
+
+		-- Tool ESP
+		if S.toolESP and ohTextOK then
+			entry.toolLabel = newText()
+			if entry.toolLabel then
+				entry.toolLabel.Size = 14
+				entry.toolLabel.Center = true
+			end
+		end
+
+		cache[plr] = entry
+	end
+
+	local function rebuildAll()
+		for plr in pairs(cache) do removeCacheEntry(plr) end
+		if not (S.nameESP or S.boneESP or S.snapESP or S.distESP or S.boxESP or S.healthESP or S.chamsESP or S.toolESP) then return end
+		for _, plr in pairs(Players:GetPlayers()) do
+			if plr ~= LP then pcall(buildCache, plr) end
+		end
+	end
+
+	-- ─── Update loop (Native FPS, Self-Healing & Leak-Free) ──────────────────
+	table.insert(S.conns, RunService.RenderStepped:Connect(function()
+		local activeName    = S.nameESP
+		local activeBone    = S.boneESP
+		local activeSnap    = S.snapESP
+		local activeDist    = S.distESP
+		local activeBox     = S.boxESP
+		local activeHealth  = S.healthESP
+		local activeChams   = S.chamsESP
+		local activeTool    = S.toolESP
+
+		if not (activeName or activeBone or activeSnap or activeDist or activeBox or activeHealth or activeChams or activeTool) then
+			for plr in pairs(cache) do removeCacheEntry(plr) end
+			return
+		end
+
+		local cam        = workspace.CurrentCamera
+		local vp         = cam.ViewportSize
+		local myRoot     = getRoot()
+		local snapOrigin = Vector2_new(vp.X * 0.5, vp.Y)
+		local currentESPColor = S.espColor
+
+		-- 1. Dynamic player cleanup (players who left)
+		for plr in pairs(cache) do
+			if not plr or not plr:IsDescendantOf(Players) then
+				removeCacheEntry(plr)
+			end
+		end
+
+		-- 2. Update and render active players
+		local playersList = Players:GetPlayers()
+		for i = 1, #playersList do
+			local plr = playersList[i]
+			if plr == LP then continue end
+			local char = plr.Character
+			if not char then
+				removeCacheEntry(plr)
+				continue
+			end
+
+			local e = cache[plr]
+			if not e or e.char ~= char then
+				pcall(buildCache, plr)
+				e = cache[plr]
+			end
+			if not e then continue end
+
+			-- Set up fast projection caching local variables for this frame
+			local parts = e.parts
+			local projected = {}
+			local projectedInViewport = {}
+
+			local function getProjected(partName)
+				local proj = projected[partName]
+				if proj ~= nil then return proj, projectedInViewport[partName] end
+				local part = parts[partName]
+				if not part or part.Parent ~= char then
+					part = char:FindFirstChild(partName)
+					parts[partName] = part
+				end
+				if part then
+					local p3, inVP = cam:WorldToViewportPoint(part.Position)
+					projected[partName] = p3
+					projectedInViewport[partName] = inVP
+					return p3, inVP
+				end
+				projected[partName] = false
+				projectedInViewport[partName] = false
+				return false, false
+			end
+
+			local headPart = parts["Head"]
+			if not headPart or headPart.Parent ~= char then
+				headPart = char:FindFirstChild("Head")
+				parts["Head"] = headPart
+			end
+			if not headPart then continue end
+
+			local hPos3, inViewport = getProjected("Head")
+			if not hPos3 then continue end
+			local inFront = hPos3.Z > 0
+
+			-- ── Name Billboard Fallback ───────────────────────────────
+			local bill = e.billboard
+			if bill then
+				bill.Enabled = inViewport and activeName
+				local lbl = e.billboardLabel
+				if lbl then lbl.TextColor3 = currentESPColor end
+			end
+
+			-- ── Extremities Projection for Bounding Box ────────────────
+			local minX, minY = math.huge, math.huge
+			local maxX, maxY = -math.huge, -math.huge
+			local anyProjected = false
+
+			if activeBox or activeHealth or activeName or activeDist or activeTool then
+				local exList = e.isR6 and {"Head", "Torso", "Left Arm", "Right Arm", "Left Leg", "Right Leg"} or 
+				                          {"Head", "LeftHand", "RightHand", "LeftFoot", "RightFoot", "UpperTorso", "LowerTorso"}
+
+				for j = 1, #exList do
+					local p3, inVP = getProjected(exList[j])
+					if p3 and p3.Z > 0 then
+						anyProjected = true
+						if p3.X < minX then minX = p3.X end
+						if p3.X > maxX then maxX = p3.X end
+						if p3.Y < minY then minY = p3.Y end
+						if p3.Y > maxY then maxY = p3.Y end
+					end
+				end
+			end
+
+			local hasBox = anyProjected and (maxX > minX) and (maxY > minY)
+			local x, y, width, height = 0, 0, 0, 0
+			if hasBox then
+				x = math_floor(minX - 4)
+				y = math_floor(minY - 4)
+				width = math_floor((maxX - minX) + 8)
+				height = math_floor((maxY - minY) + 8)
+			end
+
+			-- ── Box & Health Bar ─────────────────────────────────────────
+			local box   = e.box
+			local hBar  = e.healthBar
+			local hBg   = e.healthBg
+			local showBox = activeBox and box
+			local showHealth = activeHealth and hBar and hBg
+
+			if showBox and hasBox and inViewport then
+				box.Position = Vector2_new(x, y)
+				box.Size     = Vector2_new(width, height)
+				box.Color    = currentESPColor
+				box.Visible  = true
+			else
+				if box then box.Visible = false end
+			end
+
+			if showHealth and hasBox and inViewport then
+				local hum = char:FindFirstChildOfClass("Humanoid")
+				local health = hum and hum.Health or 100
+				local maxHealth = hum and hum.MaxHealth or 100
+				local healthPercent = math.clamp(health / maxHealth, 0, 1)
+
+				local hColor = Color3_fromRGB(0, 255, 0)
+				if healthPercent <= 0.3 then
+					hColor = Color3_fromRGB(255, 0, 0)
+				elseif healthPercent <= 0.7 then
+					hColor = Color3_fromRGB(255, 255, 0)
+				end
+
+				local barX = x - 6
+				hBg.From    = Vector2_new(barX, y)
+				hBg.To      = Vector2_new(barX, y + height)
+				hBg.Visible = true
+
+				hBar.From    = Vector2_new(barX, y + height)
+				hBar.To      = Vector2_new(barX, y + height - (height * healthPercent))
+				hBar.Color   = hColor
+				hBar.Visible = true
+			else
+				if hBar then hBar.Visible = false end
+				if hBg  then hBg.Visible  = false end
+			end
+
+			-- ── Name Label (Drawing) ──────────────────────────────────
+			local nLabel = e.nameLabel
+			if nLabel then
+				if inViewport and activeName then
+					nLabel.Text     = plr.Name
+					nLabel.Color    = currentESPColor
+					if hasBox then
+						nLabel.Position = Vector2_new(x + (width * 0.5), y - 18)
+					else
+						nLabel.Position = Vector2_new(hPos3.X, hPos3.Y - 22)
+					end
+					nLabel.Visible  = true
+				else
+					nLabel.Visible  = false
+				end
+			end
+
+			-- ── Distance & Tool Labels ────────────────────────────────
+			local dLabel = e.distLabel
+			local tLabel = e.toolLabel
+
+			if inViewport and (activeDist or activeTool) then
+				local currentBottomY = hasBox and (y + height + 2) or (hPos3.Y + 12)
+				local labelX = hasBox and (x + (width * 0.5)) or hPos3.X
+
+				if activeDist and dLabel then
+					local dist = myRoot and math_floor((myRoot.Position - headPart.Position).Magnitude) or 0
+					dLabel.Text     = dist .. "m"
+					dLabel.Color    = currentESPColor
+					dLabel.Center   = true
+					dLabel.Position = Vector2_new(labelX, currentBottomY)
+					dLabel.Visible  = true
+					currentBottomY = currentBottomY + 14
+				else
+					if dLabel then dLabel.Visible = false end
+				end
+
+				if activeTool and tLabel then
+					local tool = char:FindFirstChildOfClass("Tool")
+					if tool then
+						tLabel.Text     = tool.Name
+						tLabel.Color    = Color3_fromRGB(240, 240, 240)
+						tLabel.Position = Vector2_new(labelX, currentBottomY)
+						tLabel.Visible  = true
+					else
+						tLabel.Visible  = false
+					end
+				else
+					if tLabel then tLabel.Visible = false end
+				end
+			else
+				if dLabel then dLabel.Visible = false end
+				if tLabel then tLabel.Visible = false end
+			end
+
+			-- ── Chams ESP (Glow) ──────────────────────────────────────
+			if activeChams then
+				local hl = e.highlight
+				if not hl or hl.Parent == nil then
+					hl = Instance.new("Highlight")
+					hl.Name = "OH_Chams"
+					hl.FillColor = currentESPColor
+					hl.OutlineColor = currentESPColor
+					hl.FillTransparency = 1
+					hl.OutlineTransparency = 0
+					
+					local coreGui = game:GetService("CoreGui")
+					local success = pcall(function()
+						hl.Parent = coreGui or LP:FindFirstChildOfClass("PlayerGui")
+					end)
+					if not success then
+						pcall(function() hl.Parent = char end)
+					end
+					e.highlight = hl
+				end
+				hl.Adornee = char
+				hl.OutlineColor = currentESPColor
+				hl.Enabled = true
+			else
+				if e.highlight then
+					pcall(function() e.highlight:Destroy() end)
+					e.highlight = nil
+				end
+			end
+
+			-- ── Snap Line ─────────────────────────────────────────────
+			local sLine = e.snapLine
+			if sLine then
+				if inFront and activeSnap then
+					local root3, rInViewport = getProjected("HumanoidRootPart")
+					if not root3 then
+						root3, rInViewport = hPos3, inViewport
+					end
+					if rInViewport or (root3 and root3.Z > 0) then
+						local snapToX = hasBox and (x + width * 0.5) or root3.X
+						local snapToY = hasBox and (y + height) or root3.Y
+						sLine.From    = snapOrigin
+						sLine.To      = Vector2_new(snapToX, snapToY)
+						sLine.Color   = currentESPColor
+						sLine.Visible = true
+					else
+						sLine.Visible = false
+					end
+				else
+					sLine.Visible = false
+				end
+			end
+
+			-- ── Bones ─────────────────────────────────────────────────
+			local bonesList = e.bones
+			if activeBone and #bonesList == 0 and ohDrawOK then
+				pcall(buildCache, plr)
+				e = cache[plr]
+				if not e then continue end
+				bonesList = e.bones
+			end
+			
+			local numBones = #bonesList
+			if activeBone and numBones > 0 then
+				local expected = e.isR6 and #BONE_R6 or #BONE_R15
+				if numBones ~= expected then
+					pcall(buildCache, plr)
+					e = cache[plr]
+					if not e then continue end
+					bonesList = e.bones
+					numBones = #bonesList
+				end
+
+				for bIdx = 1, numBones do
+					local info = bonesList[bIdx]
+					local pA3, inVPA = getProjected(info.from)
+					local pB3, inVPB = getProjected(info.to)
+					local lnObj = info.line
+					if pA3 and pB3 and pA3.Z > 0 and pB3.Z > 0 then
+						lnObj.From    = Vector2_new(pA3.X, pA3.Y)
+						lnObj.To      = Vector2_new(pB3.X, pB3.Y)
+						lnObj.Color   = currentESPColor
+						lnObj.Visible = true
+					else
+						lnObj.Visible = false
+					end
+				end
+			elseif numBones > 0 then
+				for bIdx = 1, numBones do
+					bonesList[bIdx].line.Visible = false
+				end
+			end
+		end
+	end))
+
+	-- ─── ESP Tab UI ─────────────────────────────────────────────────────────
+	ESPTab:AddLabel("ESP Options", "eye")
+	ESPTab:AddSeparator()
+
+	ESPTab:AddColorPicker({
+		Title    = "ESP Color",
+		Subtitle = "Color for all ESP elements",
+		Icon     = "palette",
+		Default  = S.espColor,
+		Callback = function(col) S.espColor = col end,
+	})
+
+	ESPTab:AddSeparator()
+
+	Toggles.NameESP = ESPTab:AddToggle({
+		Title    = "Name ESP",
+		Subtitle = "Player names above head (always on top)",
+		Icon     = "tag",
+		Default  = false,
+		Callback = function(on)
+			S.nameESP = on; rebuildAll()
+			notify("Name ESP", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	Toggles.BoneESP = ESPTab:AddToggle({
+		Title    = "Bone ESP",
+		Subtitle = "Skeleton overlay for R6 & R15 avatars",
+		Icon     = "activity",
+		Default  = false,
+		Callback = function(on)
+			if on and not ohDrawOK then
+				notify("Bone ESP", "Visuals not supported by current executor!", "x"); return
+			end
+			S.boneESP = on
+			if not on then
+				for _, e in pairs(cache) do
+					for _, info in ipairs(e.bones or {}) do
+						pcall(function() info.line.Visible = false end)
+					end
+				end
+			end
+			rebuildAll()
+			notify("Bone ESP", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	Toggles.SnapESP = ESPTab:AddToggle({
+		Title    = "Snap Lines",
+		Subtitle = "Draws a line from screen bottom to players",
+		Icon     = "arrow-down",
+		Default  = false,
+		Callback = function(on)
+			if on and not ohDrawOK then
+				notify("Snap Lines", "Visuals not supported by current executor!", "x"); return
+			end
+			S.snapESP = on
+			if not on then
+				for _, e in pairs(cache) do
+					if e.snapLine then pcall(function() e.snapLine.Visible = false end) end
+				end
+			end
+			rebuildAll()
+			notify("Snap Lines", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	Toggles.DistESP = ESPTab:AddToggle({
+		Title    = "Distance",
+		Subtitle = "Displays distance in studs to each player",
+		Icon     = "maximize",
+		Default  = false,
+		Callback = function(on)
+			if on and not ohTextOK then
+				notify("Distance", "Visuals not supported by current executor!", "x"); return
+			end
+			S.distESP = on
+			if not on then
+				for _, e in pairs(cache) do
+					if e.distLabel then pcall(function() e.distLabel.Visible = false end) end
+				end
+			end
+			rebuildAll()
+			notify("Distance", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	Toggles.BoxESP = ESPTab:AddToggle({
+		Title    = "Box ESP",
+		Subtitle = "Draws a 2D box outline around players",
+		Icon     = "box",
+		Default  = false,
+		Callback = function(on)
+			if on and not ohDrawOK then
+				notify("Box ESP", "Visuals not supported by current executor!", "x"); return
+			end
+			S.boxESP = on
+			if not on then
+				for _, e in pairs(cache) do
+					if e.box then pcall(function() e.box.Visible = false end) end
+				end
+			end
+			rebuildAll()
+			notify("Box ESP", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	Toggles.HealthESP = ESPTab:AddToggle({
+		Title    = "Health Bar",
+		Subtitle = "Draws a visual health bar next to the box",
+		Icon     = "heart",
+		Default  = false,
+		Callback = function(on)
+			if on and not ohDrawOK then
+				notify("Health Bar", "Visuals not supported by current executor!", "x"); return
+			end
+			S.healthESP = on
+			if not on then
+				for _, e in pairs(cache) do
+					if e.healthBar then pcall(function() e.healthBar.Visible = false end) end
+					if e.healthBg  then pcall(function() e.healthBg.Visible  = false end) end
+				end
+			end
+			rebuildAll()
+			notify("Health Bar", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	Toggles.ChamsESP = ESPTab:AddToggle({
+		Title    = "Chams ESP",
+		Subtitle = "Visual highlight through walls (Universal)",
+		Icon     = "ghost",
+		Default  = false,
+		Callback = function(on)
+			S.chamsESP = on
+			if not on then
+				for _, e in pairs(cache) do
+					if e.highlight then pcall(function() e.highlight:Destroy() end) e.highlight = nil end
+				end
+			end
+			rebuildAll()
+			notify("Chams ESP", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+
+	Toggles.ToolESP = ESPTab:AddToggle({
+		Title    = "Tool ESP",
+		Subtitle = "Displays the name of the held item",
+		Icon     = "briefcase",
+		Default  = false,
+		Callback = function(on)
+			if on and not ohTextOK then
+				notify("Tool ESP", "Visuals not supported by current executor!", "x"); return
+			end
+			S.toolESP = on
+			if not on then
+				for _, e in pairs(cache) do
+					if e.toolLabel then pcall(function() e.toolLabel.Visible = false end) end
+				end
+			end
+			rebuildAll()
+			notify("Tool ESP", on and "Enabled" or "Disabled", on and "check" or "x")
+		end,
+	})
+end
+
+-- ════════════════════════════════════════════════════════
+-- KEYBINDS
+-- ════════════════════════════════════════════════════════
+do
+	KeybindsTab:AddLabel("Abilities Keybinds", "zap")
+	KeybindsTab:AddSeparator()
+
+	KeybindsTab:AddKeybind({
+		Title    = "Fly",
+		Subtitle = "Toggle flying on/off",
+		Icon     = "wind",
+		Default  = Enum.KeyCode.F,
+		Callback = function()
+			if Toggles.Fly then
+				Toggles.Fly:Set(not S.fly)
+			end
+		end,
+	})
+
+	KeybindsTab:AddKeybind({
+		Title    = "Noclip",
+		Subtitle = "Toggle walk through walls",
+		Icon     = "box",
+		Default  = Enum.KeyCode.N,
+		Callback = function()
+			if Toggles.Noclip then
+				Toggles.Noclip:Set(not S.noclip)
+			end
+		end,
+	})
+
+	KeybindsTab:AddKeybind({
+		Title    = "Infinite Jump",
+		Subtitle = "Toggle infinite jump on/off",
+		Icon     = "chevrons-up",
+		Default  = Enum.KeyCode.G,
+		Callback = function()
+			if Toggles.InfJump then
+				Toggles.InfJump:Set(not S.infJump)
+			end
+		end,
+	})
+
+	KeybindsTab:AddSeparator()
+	KeybindsTab:AddLabel("ESP Keybinds", "eye")
+	KeybindsTab:AddSeparator()
+
+	KeybindsTab:AddKeybind({
+		Title    = "Name ESP",
+		Subtitle = "Toggle Player Name ESP",
+		Icon     = "tag",
+		Default  = Enum.KeyCode.Unknown,
+		Callback = function()
+			if Toggles.NameESP then
+				Toggles.NameESP:Set(not S.nameESP)
+			end
+		end,
+	})
+
+	KeybindsTab:AddKeybind({
+		Title    = "Bone ESP",
+		Subtitle = "Toggle Skeleton ESP",
+		Icon     = "activity",
+		Default  = Enum.KeyCode.Unknown,
+		Callback = function()
+			if Toggles.BoneESP then
+				Toggles.BoneESP:Set(not S.boneESP)
+			end
+		end,
+	})
+
+	KeybindsTab:AddKeybind({
+		Title    = "Box ESP",
+		Subtitle = "Toggle Bounding Box ESP",
+		Icon     = "box",
+		Default  = Enum.KeyCode.Unknown,
+		Callback = function()
+			if Toggles.BoxESP then
+				Toggles.BoxESP:Set(not S.boxESP)
+			end
+		end,
+	})
+
+	KeybindsTab:AddKeybind({
+		Title    = "Chams ESP",
+		Subtitle = "Toggle Glowing Outline Chams",
+		Icon     = "ghost",
+		Default  = Enum.KeyCode.Unknown,
+		Callback = function()
+			if Toggles.ChamsESP then
+				Toggles.ChamsESP:Set(not S.chamsESP)
+			end
+		end,
+	})
+end
+
+-- ════════════════════════════════════════════════════════
+-- SUS
+-- ════════════════════════════════════════════════════════
+do
+	local function getRig()
+		local c = LP.Character or LP.CharacterAdded:Wait()
+		local h = c:FindFirstChildOfClass("Humanoid")
+		return (h and h.RigType==Enum.HumanoidRigType.R15) and "R15" or "R6"
+	end
+	getgenv().ohRig = getRig()
+
+	SUSTab:AddLabel("Rig: "..ohRig, "user")
+	SUSTab:AddSeparator()
+
+	getgenv().ohSusData = {
+		{n="Bang V2",    r6="https://pastebin.com/raw/aPSHMV6K",   r15="https://pastebin.com/raw/1ePMTt9n"},
+		{n="Get Banged", r6="https://pastebin.com/raw/zHbw7ND1",   r15="https://pastebin.com/raw/7hvcjDnW"},
+		{n="Suck",       r6="https://pastebin.com/raw/SymCfnAW",   r15="https://pastebin.com/raw/p8yxRfr4"},
+		{n="Get Suc",    r6="https://pastebin.com/raw/FPu4e2Qh",   r15="https://pastebin.com/raw/DyPP2tAF"},
+		{n="Jerk",       r6="https://pastefy.app/wa3v2Vgm/raw",    r15="https://pastefy.app/YZoglOyJ/raw"},
+	}
+
+	for _, e in ipairs(ohSusData) do
+		SUSTab:AddButton({
+			Title    = e.n,
+			Subtitle = "Rig: "..ohRig,
+			Icon     = "heart",
+			Text     = "Run",
+			Callback = function()
+				local url = (ohRig=="R15") and e.r15 or e.r6
+				loadstring(game:HttpGet(url, true))()
+				notify(e.n, "Started ["..ohRig.."]", "play")
+			end,
+		})
+	end
+end
+
+-- ════════════════════════════════════════════════════════
+-- SCRIPTS
+-- ════════════════════════════════════════════════════════
+do
+	ScriptTab:AddLabel("Script Hub", "code")
+	ScriptTab:AddSeparator()
+
+	getgenv().ohScripts = {
+		{n="Infinite Yield",   u="https://raw.githubusercontent.com/edgeiy/infiniteyield/master/source"},
+		{n="Open GUI",         u="https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/Open%20Gui"},
+		{n="Cobalt",           u="https://raw.githubusercontent.com/Snipez-Dev/Rbx-Scripts/refs/heads/main/Cobalt.luau"},
+		{n="Dark Dex",         u="https://raw.githubusercontent.com/infyiff/backup/main/dex.lua"},
+		{n="Novoline Admin",   u="https://rawscripts.net/raw/Universal-Script-Novoline-Universal-with-150-Commands-215755"},
+		{n="UGC Emotes",   u="https://raw.githubusercontent.com/7yd7/Hub/refs/heads/Branch/GUIS/Emotes.lua"},
+	}
+
+	for _, e in ipairs(ohScripts) do
+		ScriptTab:AddButton({
+			Title    = e.n,
+			Icon     = "terminal",
+			Text     = "Load",
+			Callback = function()
+				loadstring(game:HttpGet(e.u, true))()
+				notify(e.n, "Loaded!", "check")
+			end,
+		})
+	end
+end
+
+-- ════════════════════════════════════════════════════════
+-- SERVER  (Info + TP + Spectate)
+-- ════════════════════════════════════════════════════════
+do
+	ServerTab:AddLabel("Server Actions", "server")
+	ServerTab:AddSeparator()
+
+	ServerTab:AddButton({
+		Title    = "Copy Place ID",
+		Subtitle = tostring(game.PlaceId),
+		Icon     = "clipboard",
+		Text     = "Copy",
+		Callback = function()
+			pcall(setclipboard, tostring(game.PlaceId))
+			notify("PlaceId", "Copied!", "check")
+		end,
+	})
+
+	ServerTab:AddButton({
+		Title    = "Copy Job ID",
+		Subtitle = game.JobId:sub(1,24).."…",
+		Icon     = "clipboard",
+		Text     = "Copy",
+		Callback = function()
+			pcall(setclipboard, game.JobId)
+			notify("JobId", "Copied!", "check")
+		end,
+	})
+
+	ServerTab:AddButton({
+		Title    = "Rejoin",
+		Subtitle = "Rejoin current server",
+		Icon     = "refresh-cw",
+		Text     = "Rejoin",
+		Callback = function() TS:Teleport(game.PlaceId, LP) end,
+	})
+
+	ServerTab:AddSeparator()
+	ServerTab:AddLabel("Teleport to Player", "map-pin")
+	ServerTab:AddSeparator()
+
+	local tpTarget = nil
+	local tpDrop = ServerTab:AddDropdown({
+		Title    = "Player (TP)",
+		Icon     = "users",
+		Options  = getPlayerNames(),
+		Default  = 1,
+		Callback = function(name) tpTarget = Players:FindFirstChild(name) end,
+	})
+	tpTarget = Players:FindFirstChild(getPlayerNames()[1] or "")
+
+	local specDrop
+	local function refreshDrops()
+		task.wait(0.5)
+		local names = getPlayerNames()
+		if tpDrop  and tpDrop.SetOptions  then tpDrop:SetOptions(names)  end
+		if specDrop and specDrop.SetOptions then specDrop:SetOptions(names) end
+		if bhDrop and bhDrop.SetOptions then bhDrop:SetOptions(names) end
+	end
+	table.insert(S.conns, Players.PlayerAdded:Connect(refreshDrops))
+	table.insert(S.conns, Players.PlayerRemoving:Connect(refreshDrops))
+
+	ServerTab:AddButton({
+		Title    = "Teleport",
+		Subtitle = "Teleport to selected player",
+		Icon     = "navigation",
+		Text     = "TP",
+		Callback = function()
+			if not tpTarget then notify("TP", "No player selected", "x"); return end
+			local root  = getRoot()
+			local troot = tpTarget.Character and tpTarget.Character:FindFirstChild("HumanoidRootPart")
+			if root and troot then
+				root.CFrame = troot.CFrame * CFrame.new(3,0,0)
+				notify("TP", "→ "..tpTarget.Name, "check")
+			else
+				notify("TP", "Character not found", "x")
+			end
+		end,
+	})
+
+	ServerTab:AddSeparator()
+	ServerTab:AddLabel("Spectate", "video")
+	ServerTab:AddSeparator()
+
+	local spectateTarget = nil
+	local spectateConn   = nil
+
+	specDrop = ServerTab:AddDropdown({
+		Title    = "Player (Spectate)",
+		Icon     = "eye",
+		Options  = getPlayerNames(),
+		Default  = 1,
+		Callback = function(name) spectateTarget = Players:FindFirstChild(name) end,
+	})
+	spectateTarget = Players:FindFirstChild(getPlayerNames()[1] or "")
+
+	local specToggle
+	specToggle = ServerTab:AddToggle({
+		Title    = "Spectate On/Off",
+		Subtitle = "Follow selected player's camera (Locks your movement)",
+		Icon     = "video",
+		Default  = false,
+		Callback = function(on)
+			if on then
+				if not spectateTarget then
+					notify("Spectate", "No player selected", "x")
+					if specToggle then specToggle:Set(false) end
+					return
+				end
+				local h = spectateTarget.Character and spectateTarget.Character:FindFirstChildOfClass("Humanoid")
+				if not h then
+					notify("Spectate", "No character", "x")
+					if specToggle then specToggle:Set(false) end
+					return
+				end
+				workspace.CurrentCamera.CameraSubject = h
+				S.spectateTarget = spectateTarget
+				
+				-- Anchor the local character immediately
+				pcall(function()
+					local root = getRoot()
+					if root then root.Anchored = true end
+				end)
+
+				S.spectateConn = RunService.RenderStepped:Connect(function()
+					if S.spectateTarget and S.spectateTarget.Character then
+						local sh = S.spectateTarget.Character:FindFirstChildOfClass("Humanoid")
+						if sh then workspace.CurrentCamera.CameraSubject = sh end
+					end
+					
+					-- Force-anchor local character during spectate
+					pcall(function()
+						local root = getRoot()
+						if root then root.Anchored = true end
+					end)
+				end)
+				notify("Spectate", "Watching: "..S.spectateTarget.Name, "check")
+			else
+				if S.spectateConn then S.spectateConn:Disconnect(); S.spectateConn = nil end
+				S.spectateTarget = nil
+				
+				-- Unanchor local character on stop
+				pcall(function()
+					local root = getRoot()
+					if root then root.Anchored = false end
+				end)
+
+				local myH = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
+				if myH then workspace.CurrentCamera.CameraSubject = myH end
+				notify("Spectate", "Stopped", "x")
+			end
+		end,
+	})
+end
+
+-- ════════════════════════════════════════════════════════
+-- SETTINGS
+-- ════════════════════════════════════════════════════════
+do
+	SettingsTab:AddLabel("Keybinds", "keyboard")
+	SettingsTab:AddSeparator()
+
+	SettingsTab:AddKeybind({
+		Title    = "Toggle UI",
+		Subtitle = "Show / hide the UI",
+		Icon     = "monitor",
+		Default  = Enum.KeyCode.RightShift,
+		Callback = function()
+			Window:Toggle()
+		end,
+	})
+
+	SettingsTab:AddSeparator()
+	SettingsTab:AddLabel("Config", "save")
+	SettingsTab:AddSeparator()
+
+	Window.ConfigManager:SetFolder("OceanHub")
+	local Cfg = Window.ConfigManager:CreateConfig("Default")
+
+	SettingsTab:AddButton({
+		Title    = "Save Config",
+		Icon     = "save",
+		Text     = "Save",
+		Callback = function() Cfg:Save(); notify("Config", "Saved!", "check") end,
+	})
+
+	SettingsTab:AddButton({
+		Title    = "Load Config",
+		Icon     = "download",
+		Text     = "Load",
+		Callback = function() Cfg:Load(); notify("Config", "Loaded!", "check") end,
+	})
+
+	SettingsTab:AddSeparator()
+
+	SettingsTab:AddButton({
+		Title    = "Unload",
+		Subtitle = "Remove Ocean Hub",
+		Icon     = "log-out",
+		Text     = "Unload",
+		Callback = function()
+			for _, c in pairs(S.conns) do pcall(function() c:Disconnect() end) end
+			if S.flyConn then S.flyConn:Disconnect() end
+			if S.flyBV   then S.flyBV:Destroy() end
+			if S.flyBG   then S.flyBG:Destroy() end
+			
+			-- Clean up Spectate
+			if S.spectateConn then pcall(function() S.spectateConn:Disconnect() end); S.spectateConn = nil end
+			S.spectateTarget = nil
+
+			-- Clean up Freecam
+			if S.freecamConn then pcall(function() S.freecamConn:Disconnect() end); S.freecamConn = nil end
+			if S.freecamInputBegin then pcall(function() S.freecamInputBegin:Disconnect() end); S.freecamInputBegin = nil end
+			if S.freecamInputEnd then pcall(function() S.freecamInputEnd:Disconnect() end); S.freecamInputEnd = nil end
+			if S.freecamPart then pcall(function() S.freecamPart:Destroy() end); S.freecamPart = nil end
+
+			-- Restore Local Player character camera & physics
+			pcall(function()
+				local cam = workspace.CurrentCamera
+				local char = LP.Character
+				local hum = char and char:FindFirstChildOfClass("Humanoid")
+				if cam and hum then cam.CameraSubject = hum end
+				local root = getRoot()
+				if root then root.Anchored = false end
+			end)
+
+			for _, e in pairs(ohESPCache or {}) do
+				pcall(function() if e.billboard then e.billboard:Destroy() end end)
+				for _, info in ipairs(e.bones or {}) do pcall(function() info.line:Remove() end) end
+				if e.snapLine  then pcall(function() e.snapLine:Remove() end) end
+				if e.distLabel then pcall(function() e.distLabel:Remove() end) end
+				if e.toolLabel then pcall(function() e.toolLabel:Remove() end) end
+				if e.highlight then pcall(function() e.highlight:Destroy() end) end
+				if e.box       then pcall(function() e.box:Remove() end) end
+				if e.healthBar then pcall(function() e.healthBar:Remove() end) end
+				if e.healthBg  then pcall(function() e.healthBg:Remove() end) end
+			end
+			getgenv().ohESPCache = {}
+			Window:Destroy()
+		end,
+	})
+end
+
