@@ -13301,7 +13301,7 @@ do
 			if gui:IsA("TextBox") then remember(record, "PlaceholderColor3", palette.Muted) end
 			if gui == Title then
 				remember(record, "TextSize", 14)
-				remember(record, "Text", "INF UP / " .. palette.Label)
+				remember(record, "Text", "Infinite Yield")
 			end
 			if gui.Name == "Title" and gui.Parent and gui.Parent.Name == "TopBar" then remember(record, "TextSize", 12) end
 			if gui == Cmdbar then remember(record, "TextSize", 16) end
