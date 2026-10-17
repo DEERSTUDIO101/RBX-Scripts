@@ -299,33 +299,30 @@ function randomString()
 	return table.concat(array)
 end
 
-PARENT = nil
-MAX_DISPLAY_ORDER = 1.7976931348623157e308
-if gethui then
-    local Main = Instance.new("ScreenGui")
-    Main.Name = randomString()
-    Main.ResetOnSpawn = false
-    Main.DisplayOrder = MAX_DISPLAY_ORDER
-    Main.Parent = gethui()
-    PARENT = Main
-elseif (not is_sirhurt_closure) and syn_protect_gui then
-    local Main = Instance.new("ScreenGui")
-    Main.Name = randomString()
-    Main.ResetOnSpawn = false
-    Main.DisplayOrder = MAX_DISPLAY_ORDER
-    syn_protect_gui(Main)
-    Main.Parent = COREGUI
-    PARENT = Main
-elseif COREGUI:FindFirstChild("RobloxGui") then
-    PARENT = COREGUI.RobloxGui
-else
-    local Main = Instance.new("ScreenGui")
-    Main.Name = randomString()
-    Main.ResetOnSpawn = false
-    Main.DisplayOrder = MAX_DISPLAY_ORDER
-    Main.Parent = COREGUI
-    PARENT = Main
+-- IY GUI ROOT BEGIN
+MAX_DISPLAY_ORDER = 2147483647
+function ensureIYGuiRoot()
+	local previous = PARENT
+	local main = previous
+	if not main or not main:IsA("ScreenGui") or main == COREGUI:FindFirstChild("RobloxGui") then
+		main = Instance.new("ScreenGui")
+	end
+	if syn_protect_gui and not is_sirhurt_closure then pcall(syn_protect_gui, main) end
+	main.Name = HttpService:GenerateGUID(false):gsub("%-", "")
+	main.ResetOnSpawn = false
+	main.DisplayOrder = MAX_DISPLAY_ORDER
+	main.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+	main.Parent = COREGUI
+	if previous and previous ~= main then
+		for _, object in pairs({content = ScaledHolder, quick = IYQuickCapture, selection = selectionBox, selected = selected}) do
+			if object and object.Parent == previous then object.Parent = main end
+		end
+	end
+	PARENT = main
+	return main
 end
+ensureIYGuiRoot()
+-- IY GUI ROOT END
 
 shade1 = {}
 shade2 = {}
@@ -4916,8 +4913,8 @@ for i = 1, #CMDs do
 	if CMDs[i].DESC ~= "" then
 		newcmd:SetAttribute("Title", CMDs[i].NAME)
 		newcmd:SetAttribute("Desc", CMDs[i].DESC)
-		newcmd.MouseButton1Down:Connect(function()
-			if not IsOnMobile and newcmd.Visible and newcmd.TextTransparency == 0 then
+		newcmd.Activated:Connect(function()
+			if newcmd.Visible and newcmd.TextTransparency == 0 then
 				local currentText = Cmdbar.Text
 				Cmdbar:CaptureFocus()
 				autoComplete(newcmd.Text, currentText)
@@ -5254,7 +5251,7 @@ function addcmdtext(text,name,desc)
 	if desc and desc ~= '' then
 		newcmd:SetAttribute("Title", tooltipText)
 		newcmd:SetAttribute("Desc", tooltipDesc)
-		newcmd.MouseButton1Down:Connect(function()
+		newcmd.Activated:Connect(function()
 			if newcmd.Visible and newcmd.TextTransparency == 0 then
 				Cmdbar:CaptureFocus()
 				autoComplete(newcmd.Text)
@@ -13078,13 +13075,14 @@ end)
 
 if IsOnMobile then
 	local QuickCapture = Instance.new("TextButton")
+	IYQuickCapture = QuickCapture
 	local UICorner = Instance.new("UICorner")
 	QuickCapture.Name = randomString()
 	QuickCapture.Parent = PARENT
 	QuickCapture.BackgroundColor3 = Color3.fromRGB(46, 46, 47)
 	QuickCapture.BackgroundTransparency = 0.14
 	QuickCapture.Position = UDim2.new(0.489, 0, 0, 0)
-	QuickCapture.Size = UDim2.new(0, 32, 0, 33)
+	QuickCapture.Size = UDim2.fromOffset(44, 44)
 	QuickCapture.Font = Enum.Font.SourceSansBold
 	QuickCapture.Text = "IY"
 	QuickCapture.TextColor3 = Color3.fromRGB(255, 255, 255)
@@ -13307,7 +13305,7 @@ do
 			if gui == Cmdbar then remember(record, "TextSize", 16) end
 			if gui.Parent == CMDsF and gui:IsA("TextButton") then
 				remember(record, "TextSize", 14)
-				remember(record, "Size", UDim2.new(1, -8, 0, 24))
+				remember(record, "Size", UDim2.new(1, -8, 0, IsOnMobile and 34 or 24))
 			end
 		end
 		if gui:IsA("GuiButton") then remember(record, "AutoButtonColor", false) end
@@ -13677,6 +13675,133 @@ do
 	UI.CalendarTask = task.delay(60, checkCalendar)
 end
 -- INF UP UI END
+
+-- IY MOBILE INPUT BEGIN
+do
+	if IYMobileInput then IYMobileInput:Destroy() end
+	local inputGuard = {Alive = true, Root = PARENT, Touches = {}, Records = {}, Connections = {}}
+	IYMobileInput = inputGuard
+	getgenv().IYMobileInput = inputGuard
+	inputGuard.ActionName = HttpService:GenerateGUID(false):gsub("%-", "")
+	local function decorative(gui)
+		local node = gui
+		while node and node ~= PARENT do
+			if node.Name == "INFUP_SeasonFX" then return true end
+			node = node.Parent
+		end
+		return false
+	end
+	local function region(gui)
+		if not gui:IsA("GuiObject") or gui == ScaledHolder or decorative(gui) then return false end
+		return gui:IsA("GuiButton") or gui:IsA("TextBox") or gui:IsA("ScrollingFrame")
+			or gui:IsA("Frame") and (gui.BackgroundTransparency < 0.99 or gui.Active)
+	end
+	function inputGuard:HitTest(point)
+		if not self.Alive or not self.Root.Parent or not self.Root.Enabled then return false end
+		local ok, objects = pcall(function() return COREGUI:GetGuiObjectsAtPosition(point.X, point.Y) end)
+		if not ok then return false end
+		for _, gui in ipairs(objects) do
+			if gui:IsDescendantOf(self.Root) and region(gui) then return true end
+		end
+		return false
+	end
+	function inputGuard:Reset()
+		table.clear(self.Touches)
+	end
+	function inputGuard:HandleInput(state, input, point)
+		if not self.Alive then return Enum.ContextActionResult.Pass end
+		if input.UserInputType == Enum.UserInputType.MouseWheel then
+			return self:HitTest(point or UserInputService:GetMouseLocation()) and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+		end
+		if input.UserInputType ~= Enum.UserInputType.Touch then return Enum.ContextActionResult.Pass end
+		if state == Enum.UserInputState.Begin and self.Touches[input] == nil then
+			self.Touches[input] = self:HitTest(point or Vector2.new(input.Position.X, input.Position.Y))
+		end
+		local owned = self.Touches[input] == true
+		if state == Enum.UserInputState.End or state == Enum.UserInputState.Cancel then
+			task.defer(function() self.Touches[input] = nil end)
+		end
+		return owned and Enum.ContextActionResult.Sink or Enum.ContextActionResult.Pass
+	end
+	local function releaseRecord(gui, record)
+		record.Connection:Disconnect()
+		pcall(function()
+			if record.InputSink then gui.InputSink = record.InputSink end
+			if record.Active ~= nil then gui.Active = record.Active end
+			gui:SetAttribute("IY_InputSinkBase", nil)
+			gui:SetAttribute("IY_InputActiveBase", nil)
+		end)
+	end
+	local function register(gui)
+		if not inputGuard.Alive or inputGuard.Records[gui] or not region(gui) then return end
+		local record = {}
+		inputGuard.Records[gui] = record
+		local supported, oldSink = pcall(function() return gui.InputSink end)
+		if supported then
+			local inherited = gui:GetAttribute("IY_InputSinkBase")
+			record.InputSink = inherited and oldSink == Enum.InputSink.All and Enum.InputSink[inherited] or oldSink
+			gui:SetAttribute("IY_InputSinkBase", record.InputSink.Name)
+			gui.InputSink = Enum.InputSink.All
+		end
+		-- Active is the compatibility path for clients predating InputSink.
+		-- Do not activate disabled buttons; only the surface/list should consume input.
+		if gui:IsA("Frame") or gui:IsA("ScrollingFrame") then
+			local inherited = gui:GetAttribute("IY_InputActiveBase")
+			if inherited == nil then record.Active = gui.Active else record.Active = inherited end
+			gui:SetAttribute("IY_InputActiveBase", record.Active)
+			gui.Active = true
+		end
+		record.Connection = gui.InputBegan:Connect(function(input)
+			if input.UserInputType == Enum.UserInputType.Touch then inputGuard.Touches[input] = true end
+		end)
+	end
+	function inputGuard:Destroy()
+		if not self.Alive then return end
+		self.Alive = false
+		ContextActionService:UnbindAction(self.ActionName)
+		for _, connection in ipairs(self.Connections) do connection:Disconnect() end
+		for gui, record in pairs(self.Records) do releaseRecord(gui, record) end
+		self:Reset()
+		table.clear(self.Records)
+		table.clear(self.Connections)
+		if IYMobileInput == self then IYMobileInput = nil end
+		if getgenv().IYMobileInput == self then getgenv().IYMobileInput = nil end
+	end
+	for _, gui in ipairs(PARENT:GetDescendants()) do register(gui) end
+	table.insert(inputGuard.Connections, PARENT.DescendantAdded:Connect(function(gui)
+		if gui:IsA("GuiObject") then task.defer(function()
+			if inputGuard.Alive and gui:IsDescendantOf(inputGuard.Root) then register(gui) end
+		end) end
+	end))
+	table.insert(inputGuard.Connections, PARENT.DescendantRemoving:Connect(function(gui)
+		local record = inputGuard.Records[gui]
+		if record then task.defer(function()
+			if inputGuard.Alive and not gui:IsDescendantOf(inputGuard.Root) then
+				releaseRecord(gui, record)
+				inputGuard.Records[gui] = nil
+			end
+		end) end
+	end))
+	table.insert(inputGuard.Connections, UserInputService.InputBegan:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch and inputGuard.Touches[input] == nil then
+			inputGuard:HandleInput(Enum.UserInputState.Begin, input)
+		end
+	end))
+	table.insert(inputGuard.Connections, UserInputService.InputEnded:Connect(function(input)
+		if input.UserInputType == Enum.UserInputType.Touch then
+			task.defer(function() inputGuard.Touches[input] = nil end)
+		end
+	end))
+	table.insert(inputGuard.Connections, UserInputService.WindowFocusReleased:Connect(function() inputGuard:Reset() end))
+	table.insert(inputGuard.Connections, PARENT:GetPropertyChangedSignal("Enabled"):Connect(function()
+		if not PARENT.Enabled then inputGuard:Reset() end
+	end))
+	table.insert(inputGuard.Connections, PARENT.Destroying:Connect(function() inputGuard:Destroy() end))
+	ContextActionService:BindActionAtPriority(inputGuard.ActionName, function(_, state, input)
+		return inputGuard:HandleInput(state, input)
+	end, false, Enum.ContextActionPriority.High.Value + 100, Enum.UserInputType.Touch, Enum.UserInputType.MouseWheel)
+end
+-- IY MOBILE INPUT END
 
 -- Events
 eventEditor.RegisterEvent("OnExecute")
