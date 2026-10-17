@@ -13131,7 +13131,7 @@ end
 -- Reversible skin for existing controls and lazily created windows.
 do
 	if INFUPUI then INFUPUI:Destroy() end
-	local UI = {Version = 2, Modern = true, Alive = true, Records = {}, Connections = {}, Tweens = {}}
+	local UI = {Version = 3, Modern = true, Season = "Auto", Alive = true, Records = {}, Connections = {}, Tweens = {}, SeasonMotions = {}}
 	INFUPUI = UI
 	getgenv().INF_UP_UI = UI
 	local palette = {
@@ -13140,13 +13140,74 @@ do
 		Text = Color3.fromRGB(232, 238, 252), Muted = Color3.fromRGB(146, 161, 190),
 		Line = Color3.fromRGB(70, 88, 120)
 	}
+	local function seasonal(label, base, accent, secondary, effect)
+		return {Label = label, Surface = base, Card = base:Lerp(accent, 0.075), Raised = base:Lerp(accent, 0.18),
+			Accent = accent, Secondary = secondary, Text = accent:Lerp(Color3.new(1, 1, 1), 0.91),
+			Muted = base:Lerp(accent:Lerp(Color3.new(1, 1, 1), 0.55), 0.65), Line = base:Lerp(accent, 0.38), Effect = effect}
+	end
+	local rgb = Color3.fromRGB
+	UI.Themes = {
+		Default = seasonal("Default", rgb(18, 23, 34), rgb(133, 162, 255), rgb(186, 145, 255)),
+		Spring = seasonal("Spring", rgb(20, 29, 29), rgb(138, 226, 173), rgb(246, 171, 207), "petals"),
+		Easter = seasonal("Easter", rgb(29, 23, 40), rgb(201, 167, 255), rgb(153, 235, 196), "eggs"),
+		Summer = seasonal("Summer", rgb(16, 29, 38), rgb(94, 221, 232), rgb(255, 211, 115), "sunlight"),
+		Autumn = seasonal("Autumn", rgb(34, 24, 23), rgb(232, 162, 101), rgb(211, 186, 115), "leaves"),
+		Halloween = seasonal("Halloween", rgb(29, 20, 35), rgb(255, 167, 80), rgb(177, 130, 246), "embers"),
+		Winter = seasonal("Winter", rgb(17, 26, 39), rgb(156, 213, 250), rgb(211, 225, 255), "snow"),
+		Christmas = seasonal("Christmas", rgb(17, 29, 26), rgb(131, 218, 165), rgb(247, 191, 108), "snow"),
+		NewYear = seasonal("New Year", rgb(24, 23, 36), rgb(248, 213, 132), rgb(175, 178, 255), "stars"),
+		Valentine = seasonal("Valentine", rgb(34, 22, 31), rgb(245, 157, 190), rgb(218, 170, 245), "hearts")
+	}
+	UI.SeasonChoices = {"Auto", "Default", "Spring", "Easter", "Summer", "Autumn", "Halloween", "Winter", "Christmas", "NewYear", "Valentine"}
+	-- Gregorian computus. Date arithmetic below uses calendar days, not DST-sensitive timestamps.
+	function UI.EasterDate(year)
+		local a, b, c = year % 19, math.floor(year / 100), year % 100
+		local d, e = math.floor(b / 4), b % 4
+		local f = math.floor((b + 8) / 25)
+		local g = math.floor((b - f + 1) / 3)
+		local h = (19 * a + b - d - g + 15) % 30
+		local i, k = math.floor(c / 4), c % 4
+		local l = (32 + 2 * e + 2 * i - h - k) % 7
+		local m = math.floor((a + 11 * h + 22 * l) / 451)
+		local value = h + l - 7 * m + 114
+		return math.floor(value / 31), value % 31 + 1
+	end
+	local function calendarDay(year, month, day)
+		local lengths = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31}
+		if year % 4 == 0 and (year % 100 ~= 0 or year % 400 == 0) then lengths[2] = 29 end
+		for index = 1, month - 1 do day = day + lengths[index] end
+		return day
+	end
+	function UI.DetectSeason(date)
+		date = date or os.date("*t")
+		local month, day, year = date.month, date.day, date.year
+		if month == 12 and day >= 27 or month == 1 and day <= 5 then return "NewYear" end
+		if month == 12 and day <= 26 then return "Christmas" end
+		if month == 10 then return "Halloween" end
+		if month == 2 and day >= 7 and day <= 16 then return "Valentine" end
+		local easterMonth, easterDay = UI.EasterDate(year)
+		local distance = calendarDay(year, month, day) - calendarDay(year, easterMonth, easterDay)
+		if distance >= -7 and distance <= 1 then return "Easter" end
+		if month == 12 or month <= 2 then return "Winter" end
+		if month <= 5 then return "Spring" end
+		if month <= 8 then return "Summer" end
+		return "Autumn"
+	end
 	local styleFile = "infiniteyield/ui-style.json"
 	pcall(function()
 		if isfile and isfile(styleFile) and readfile then
 			local saved = HttpService:JSONDecode(readfile(styleFile))
 			if type(saved.modern) == "boolean" then UI.Modern = saved.modern end
+			if saved.season == "Auto" or UI.Themes[saved.season] then UI.Season = saved.season end
 		end
 	end)
+	local function selectPalette()
+		UI.ActiveSeason = UI.Season == "Auto" and UI.DetectSeason() or UI.Season
+		local theme = UI.Themes[UI.ActiveSeason]
+		for key, value in pairs(theme) do palette[key] = value end
+		palette.Effect = theme.Effect
+	end
+	selectPalette()
 
 	local function own(instance, name, parent)
 		instance.Name = "INFUP_" .. name
@@ -13224,6 +13285,7 @@ do
 		if record.Corner then record.Corner.CornerRadius = UDim.new(0, UI.Modern and record.Radius or 0) end
 		if record.Stroke then record.Stroke.Enabled = UI.Modern end
 		if record.Gradient then record.Gradient.Enabled = UI.Modern end
+		if record.Gradient then record.Gradient.Color = ColorSequence.new(palette.Accent:Lerp(Color3.new(1, 1, 1), 0.55), palette.Secondary) end
 		if record.Sheen then record.Sheen:Cancel() end
 		if record.Gradient and UI.Modern then record.Sheen:Play() end
 		if record.Reveal then record.Reveal.Scale = 1 end
@@ -13237,7 +13299,10 @@ do
 			remember(record, "Font", header and Enum.Font.GothamMedium or Enum.Font.Gotham)
 			remember(record, "TextColor3", modernColor(record.Base.TextColor3 or gui.TextColor3, true))
 			if gui:IsA("TextBox") then remember(record, "PlaceholderColor3", palette.Muted) end
-			if gui == Title then remember(record, "TextSize", 14) end
+			if gui == Title then
+				remember(record, "TextSize", 14)
+				remember(record, "Text", "INF UP / " .. palette.Label)
+			end
 			if gui.Name == "Title" and gui.Parent and gui.Parent.Name == "TopBar" then remember(record, "TextSize", 12) end
 			if gui == Cmdbar then remember(record, "TextSize", 16) end
 			if gui.Parent == CMDsF and gui:IsA("TextButton") then
@@ -13291,7 +13356,7 @@ do
 		if header and not gui:FindFirstChildOfClass("UIGradient") then
 			record.Gradient = own(Instance.new("UIGradient"), "Header", gui)
 			record.Gradient.Rotation = 16
-			record.Gradient.Color = ColorSequence.new(Color3.fromRGB(212, 225, 255), Color3.fromRGB(149, 179, 255))
+			record.Gradient.Color = ColorSequence.new(palette.Accent, palette.Secondary)
 			record.Sheen = TweenService:Create(record.Gradient, TweenInfo.new(3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Offset = Vector2.new(0.22, 0)})
 		end
 		if gui.Parent == ScaledHolder and gui ~= Holder and gui ~= Tooltip and not gui:FindFirstChildOfClass("UIScale") then
@@ -13336,6 +13401,102 @@ do
 			end
 		end
 	end
+	function UI:SaveStyle()
+		pcall(function()
+			if writefile and makefolder and isfolder then
+				if not isfolder("infiniteyield") then makefolder("infiniteyield") end
+				writefile(styleFile, HttpService:JSONEncode({modern = self.Modern, season = self.Season}))
+			end
+		end)
+	end
+	function UI:LayoutSettings()
+		local offset = 72 + (self.ThemeList.Visible and 140 or 0)
+		for gui, position in pairs(self.SettingsPositions) do
+			if gui.Parent then gui.Position = position + UDim2.fromOffset(0, offset) end
+		end
+		SettingsHolder.CanvasSize = self.SettingsCanvas + UDim2.fromOffset(0, offset)
+	end
+	function UI:RefreshSeasonControls()
+		local theme = self.Themes[self.ActiveSeason]
+		self.ThemeButton.Text = (self.Season == "Auto" and "Auto / " or "") .. theme.Label .. "  v"
+		self.ThemeButton.Font = self.Modern and Enum.Font.Gotham or Enum.Font.SourceSans
+		self.ThemeButton.TextColor3 = self.Modern and palette.Text or currentText1
+		self.ThemeButton.BackgroundColor3 = self.Modern and palette.Card or currentShade2
+		self.ThemeLabel.Font = self.Modern and Enum.Font.Gotham or Enum.Font.SourceSans
+		self.ThemeLabel.TextColor3 = self.Modern and palette.Muted or currentText1
+		self.ThemeList.BackgroundColor3 = self.Modern and palette.Surface or currentShade1
+		self.ThemeList.ScrollBarImageColor3 = self.Modern and palette.Accent or currentScroll
+		for choice, button in pairs(self.ThemeOptions) do
+			button.Text = (choice == self.Season and "> " or "  ") .. (choice == "Auto" and "Automatic" or self.Themes[choice].Label)
+			button.Font = self.Modern and Enum.Font.Gotham or Enum.Font.SourceSans
+			button.TextColor3 = self.Modern and (choice == self.Season and palette.Accent or palette.Text) or currentText1
+			button.BackgroundColor3 = self.Modern and palette.Card or currentShade2
+			button.BackgroundTransparency = choice == self.Season and 0 or 1
+		end
+		for _, corner in ipairs(self.ThemeCorners) do corner.CornerRadius = UDim.new(0, self.Modern and 5 or 0) end
+	end
+	function UI:ClearSeasonEffects()
+		for _, motion in ipairs(self.SeasonMotions) do motion:Cancel() end
+		table.clear(self.SeasonMotions)
+		if self.SeasonLayer then self.SeasonLayer:Destroy(); self.SeasonLayer = nil end
+	end
+	function UI:RefreshSeasonEffects()
+		self:ClearSeasonEffects()
+		if not self.Modern or not palette.Effect then return end
+		local layer = Instance.new("Frame")
+		layer.BackgroundTransparency = 1
+		layer.Position = UDim2.fromOffset(0, 20)
+		layer.Size = UDim2.new(1, 0, 1, -20)
+		layer.ClipsDescendants = true
+		layer.Active = false
+		layer.ZIndex = 11
+		self.SeasonLayer = own(layer, "SeasonFX", Holder)
+		local random = Random.new()
+		for index = 1, 10 do
+			local symbol = palette.Effect == "stars" or palette.Effect == "hearts"
+			local particle = Instance.new(symbol and "TextLabel" or "Frame")
+			particle.Active = false
+			particle.BorderSizePixel = 0
+			particle.ZIndex = 11
+			local x = random:NextNumber(0.04, 0.96)
+			particle.Position = UDim2.new(x, 0, 0, -12)
+			particle.Rotation = random:NextInteger(-30, 30)
+			local small = palette.Effect == "snow" or palette.Effect == "embers" or palette.Effect == "sunlight"
+			local width = small and random:NextInteger(2, 4) or random:NextInteger(4, 6)
+			particle.Size = UDim2.fromOffset(symbol and 12 or width, symbol and 12 or (small and width or width + 3))
+			local color = index % 2 == 0 and palette.Accent or palette.Secondary
+			local fadeProperty
+			if symbol then
+				particle.Text = palette.Effect == "hearts" and utf8.char(0x2665) or "+"
+				particle.Font = Enum.Font.GothamMedium
+				particle.TextSize = 12
+				particle.TextColor3 = color
+				particle.TextTransparency = 0.5
+				particle.BackgroundTransparency = 1
+				fadeProperty = "TextTransparency"
+			else
+				particle.BackgroundColor3 = palette.Effect == "snow" and palette.Text or color
+				particle.BackgroundTransparency = 0.48
+				local corner = own(Instance.new("UICorner"), "ParticleCorner", particle)
+				corner.CornerRadius = UDim.new(0.5, 0)
+				fadeProperty = "BackgroundTransparency"
+			end
+			own(particle, "Particle", layer)
+			local goals = {Position = UDim2.new(math.clamp(x + random:NextNumber(-0.12, 0.12), 0.02, 0.98), 0, 1, 12), Rotation = particle.Rotation + random:NextInteger(30, 120)}
+			goals[fadeProperty] = 1
+			local motion = TweenService:Create(particle, TweenInfo.new(random:NextNumber(5, 9), Enum.EasingStyle.Linear, Enum.EasingDirection.In, -1, false, (index - 1) * 0.45), goals)
+			table.insert(self.SeasonMotions, motion)
+			motion:Play()
+		end
+	end
+	function UI:SetSeason(choice, save)
+		if not self.Alive or choice ~= "Auto" and not self.Themes[choice] then return false end
+		self.Season = choice
+		selectPalette()
+		self:SetModern(self.Modern, false)
+		if save ~= false then self:SaveStyle() end
+		return true
+	end
 	function UI:SetModern(enabled, save)
 		if not self.Alive then return end
 		self.Modern = enabled == true
@@ -13346,18 +13507,15 @@ do
 		self.SwitchLabel.TextColor3 = self.Modern and palette.Text or currentText1
 		self.Track.BackgroundColor3 = self.Modern and palette.Accent or Color3.fromRGB(78, 78, 79)
 		animate(self.Knob, {Position = UDim2.fromOffset(self.Modern and 19 or 3, 3)}, 0.18)
-		if save ~= false then
-			pcall(function()
-				if writefile and makefolder and isfolder then
-					if not isfolder("infiniteyield") then makefolder("infiniteyield") end
-					writefile(styleFile, HttpService:JSONEncode({modern = self.Modern}))
-				end
-			end)
-		end
+		self:RefreshSeasonControls()
+		self:RefreshSeasonEffects()
+		if save ~= false then self:SaveStyle() end
 	end
 	function UI:Destroy()
 		if not self.Alive then return end
 		self.Alive = false
+		if self.CalendarTask then pcall(task.cancel, self.CalendarTask); self.CalendarTask = nil end
+		self:ClearSeasonEffects()
 		for _, connection in ipairs(self.Connections) do connection:Disconnect() end
 		for _, motion in pairs(self.Tweens) do motion:Cancel() end
 		for gui, record in pairs(self.Records) do
@@ -13377,6 +13535,8 @@ do
 		for gui, position in pairs(self.SettingsPositions) do if gui.Parent then gui.Position = position end end
 		SettingsHolder.CanvasSize = self.SettingsCanvas
 		self.Switch:Destroy()
+		self.ThemeRow:Destroy()
+		self.ThemeList:Destroy()
 		table.clear(self.Records)
 		table.clear(self.Connections)
 		table.clear(self.Tweens)
@@ -13427,6 +13587,66 @@ do
 	local knobRound = own(Instance.new("UICorner"), "Corner", knob)
 	knobRound.CornerRadius = UDim.new(1, 0)
 	table.insert(UI.Connections, switch.Activated:Connect(function() UI:SetModern(not UI.Modern) end))
+	local themeRow = Instance.new("Frame")
+	themeRow.BackgroundTransparency = 1
+	themeRow.Position = UDim2.fromOffset(5, 37)
+	themeRow.Size = UDim2.new(1, -10, 0, 28)
+	themeRow.ZIndex = 10
+	UI.ThemeRow = own(themeRow, "SeasonRow", SettingsHolder)
+	local themeLabel = Instance.new("TextLabel")
+	themeLabel.BackgroundTransparency = 1
+	themeLabel.Text = "Season"
+	themeLabel.TextSize = 12
+	themeLabel.TextXAlignment = Enum.TextXAlignment.Left
+	themeLabel.Size = UDim2.new(0, 54, 1, 0)
+	themeLabel.ZIndex = 10
+	UI.ThemeLabel = own(themeLabel, "SeasonLabel", themeRow)
+	local themeButton = Instance.new("TextButton")
+	themeButton.Position = UDim2.fromOffset(54, 0)
+	themeButton.Size = UDim2.new(1, -54, 1, 0)
+	themeButton.BorderSizePixel = 0
+	themeButton.TextSize = 11
+	themeButton.AutoButtonColor = false
+	themeButton.ZIndex = 10
+	UI.ThemeButton = own(themeButton, "SeasonSelector", themeRow)
+	UI.ThemeCorners = {own(Instance.new("UICorner"), "SeasonCorner", themeButton)}
+	local themeList = Instance.new("ScrollingFrame")
+	themeList.Position = UDim2.fromOffset(5, 70)
+	themeList.Size = UDim2.new(1, -10, 0, 132)
+	themeList.CanvasSize = UDim2.fromOffset(0, #UI.SeasonChoices * 25 + 6)
+	themeList.BorderSizePixel = 0
+	themeList.ScrollBarThickness = 3
+	themeList.Visible = false
+	themeList.ZIndex = 11
+	UI.ThemeList = own(themeList, "SeasonList", SettingsHolder)
+	table.insert(UI.ThemeCorners, own(Instance.new("UICorner"), "SeasonCorner", themeList))
+	UI.ThemeOptions = {}
+	for index, choice in ipairs(UI.SeasonChoices) do
+		local option = Instance.new("TextButton")
+		option.Position = UDim2.fromOffset(4, 3 + (index - 1) * 25)
+		option.Size = UDim2.new(1, -12, 0, 23)
+		option.TextSize = 12
+		option.TextXAlignment = Enum.TextXAlignment.Left
+		option.BorderSizePixel = 0
+		option.AutoButtonColor = false
+		option.ZIndex = 12
+		UI.ThemeOptions[choice] = own(option, "SeasonOption", themeList)
+		table.insert(UI.ThemeCorners, own(Instance.new("UICorner"), "SeasonCorner", option))
+		table.insert(UI.Connections, option.MouseEnter:Connect(function() option.BackgroundTransparency = 0 end))
+		table.insert(UI.Connections, option.MouseLeave:Connect(function() option.BackgroundTransparency = UI.Season == choice and 0 or 1 end))
+		table.insert(UI.Connections, option.Activated:Connect(function()
+			themeList.Visible = false
+			UI:SetSeason(choice)
+			UI:LayoutSettings()
+			SettingsHolder.CanvasPosition = Vector2.zero
+		end))
+	end
+	table.insert(UI.Connections, themeButton.Activated:Connect(function()
+		themeList.Visible = not themeList.Visible
+		UI:LayoutSettings()
+		if themeList.Visible then SettingsHolder.CanvasPosition = Vector2.new(0, 34) end
+	end))
+	UI:LayoutSettings()
 
 	for _, gui in ipairs(ScaledHolder:GetDescendants()) do register(gui) end
 	table.insert(UI.Connections, ScaledHolder.DescendantAdded:Connect(function(gui)
@@ -13449,6 +13669,12 @@ do
 	end))
 	table.insert(UI.Connections, ScaledHolder.Destroying:Connect(function() UI:Destroy() end))
 	UI:SetModern(UI.Modern, false)
+	local function checkCalendar()
+		if not UI.Alive then return end
+		if UI.Season == "Auto" and UI.DetectSeason() ~= UI.ActiveSeason then UI:SetSeason("Auto", false) end
+		UI.CalendarTask = task.delay(60, checkCalendar)
+	end
+	UI.CalendarTask = task.delay(60, checkCalendar)
 end
 -- INF UP UI END
 
