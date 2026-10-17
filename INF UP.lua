@@ -3445,6 +3445,7 @@ function updateColors(color,ctype)
 		end
 		currentScroll = color
 	end
+	if INFUPUI then INFUPUI:ThemeChanged(color, ctype) end
 end
 
 local colorpickerOpen = false
@@ -13139,130 +13140,330 @@ if PluginsTable ~= nil or PluginsTable ~= {} then
 	FindPlugins(PluginsTable)
 end
 
--- Modern UI polish: keep the original layout and controls, but give the shell
--- consistent depth, motion, and feedback. This block is intentionally isolated
--- from command execution so theme/customization code remains compatible.
+-- INF UP UI BEGIN
+-- Reversible skin for existing controls and lazily created windows.
 do
-	local function addCorner(gui, radius)
-		if not gui or gui:FindFirstChild("IYCorner") then return end
-		local corner = Instance.new("UICorner")
-		corner.Name = "IYCorner"
-		corner.CornerRadius = UDim.new(0, radius or 6)
-		corner.Parent = gui
-	end
+	if INFUPUI then INFUPUI:Destroy() end
+	local UI = {Version = 2, Modern = true, Alive = true, Records = {}, Connections = {}, Tweens = {}}
+	INFUPUI = UI
+	getgenv().INF_UP_UI = UI
+	local palette = {
+		Surface = Color3.fromRGB(18, 23, 34), Card = Color3.fromRGB(27, 34, 49),
+		Raised = Color3.fromRGB(43, 54, 76), Accent = Color3.fromRGB(133, 162, 255),
+		Text = Color3.fromRGB(232, 238, 252), Muted = Color3.fromRGB(146, 161, 190),
+		Line = Color3.fromRGB(70, 88, 120)
+	}
+	local styleFile = "infiniteyield/ui-style.json"
+	pcall(function()
+		if isfile and isfile(styleFile) and readfile then
+			local saved = HttpService:JSONDecode(readfile(styleFile))
+			if type(saved.modern) == "boolean" then UI.Modern = saved.modern end
+		end
+	end)
 
-	local function addStroke(gui, color, transparency, thickness)
-		if not gui or gui:FindFirstChild("IYStroke") then return end
+	local function own(instance, name, parent)
+		instance.Name = "INFUP_" .. name
+		instance.Parent = parent
+		return instance
+	end
+	local function decoration(instance)
+		return instance.Name == "INFUP_Corner" or instance.Name == "INFUP_Border"
+			or instance.Name == "INFUP_Header" or instance.Name == "INFUP_Reveal"
+	end
+	local function animate(instance, properties, duration)
+		local previous = UI.Tweens[instance]
+		if previous then previous:Cancel() end
+		local motion = TweenService:Create(instance, TweenInfo.new(duration or 0.18, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), properties)
+		UI.Tweens[instance] = motion
+		motion:Play()
+		motion.Completed:Once(function()
+			if UI.Tweens[instance] == motion then UI.Tweens[instance] = nil end
+		end)
+	end
+	local function remember(record, property, value)
+		if record.Base[property] == nil then
+			local current = record.Gui[property]
+			local inherited = record.Gui:GetAttribute("INFUP_Base_" .. property)
+			local applied = record.Gui:GetAttribute("INFUP_Applied_" .. property)
+			local comparable = typeof(current) == "EnumItem" and current.Name or current
+			if inherited ~= nil and applied == comparable then
+				record.Base[property] = property == "Font" and Enum.Font[inherited] or inherited
+			else
+				record.Base[property] = current
+			end
+		end
+		local base = record.Base[property]
+		record.Gui:SetAttribute("INFUP_Base_" .. property, typeof(base) == "EnumItem" and base.Name or base)
+		record.Gui:SetAttribute("INFUP_Applied_" .. property, typeof(value) == "EnumItem" and value.Name or value)
+		record.Gui[property] = value
+	end
+	local function neutral(color)
+		return math.max(color.R, color.G, color.B) - math.min(color.R, color.G, color.B) < 0.045
+	end
+	local function modernColor(color, text)
+		if not neutral(color) then return color end
+		local light = (color.R + color.G + color.B) / 3
+		if text then return light > 0.65 and palette.Text or (light < 0.1 and palette.Text or palette.Muted) end
+		if light < 0.16 then return palette.Surface end
+		if light < 0.25 then return palette.Card end
+		if light < 0.48 then return palette.Raised end
+		if light < 0.72 then return palette.Accent end
+		return color
+	end
+	local function isColorControl(gui)
+		local node = gui
+		while node and node ~= ScaledHolder do
+			if node.Name == "Choice" or node.Name == "Preview" or node.Name == "ColorSpace"
+				or node.Name == "ColorStrip" or node.Name == "Scope" or node.Name == "Arrow" then return true end
+			node = node.Parent
+		end
+		return false
+	end
+	local function isText(gui)
+		return gui:IsA("TextLabel") or gui:IsA("TextButton") or gui:IsA("TextBox")
+	end
+	local function makeStroke(gui)
 		local stroke = Instance.new("UIStroke")
-		stroke.Name = "IYStroke"
 		stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-		stroke.Color = color or currentShade3
-		stroke.Transparency = transparency or 0.55
-		stroke.Thickness = thickness or 1
-		stroke.Parent = gui
+		stroke.Color = palette.Line
+		stroke.Transparency = 0.6
+		stroke.Thickness = 1
+		return own(stroke, "Border", gui)
 	end
-
-	local function tween(instance, duration, properties, style, direction)
-		TweenService:Create(instance, TweenInfo.new(
-			duration or 0.18,
-			style or Enum.EasingStyle.Quint,
-			direction or Enum.EasingDirection.Out
-		), properties):Play()
-	end
-
-	-- Main shell: slightly rounded, with a quiet accent outline.
-	addCorner(Holder, 9)
-	addCorner(Title, 9)
-	addCorner(Dark, 7)
-	addCorner(Settings, 7)
-	addStroke(Holder, currentShade3, 0.35, 1)
-	addStroke(Title, currentShade3, 0.5, 1)
-
-	local titleGradient = Instance.new("UIGradient")
-	titleGradient.Name = "IYTitleGradient"
-	titleGradient.Color = ColorSequence.new({
-		ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
-		ColorSequenceKeypoint.new(0.52, Color3.fromRGB(190, 205, 255)),
-		ColorSequenceKeypoint.new(1, Color3.fromRGB(145, 160, 255))
-	})
-	titleGradient.Rotation = 12
-	titleGradient.Parent = Title
-
-	-- Buttons now lift and brighten instead of changing abruptly.
-	local function polishButton(button)
-		if not button or not button:IsA("GuiButton") or button:GetAttribute("IYPolished") then return end
-		button:SetAttribute("IYPolished", true)
-		addCorner(button, 5)
-		local baseTransparency = button.BackgroundTransparency
-		local baseColor = button.BackgroundColor3
-		button.MouseEnter:Connect(function()
-			tween(button, 0.14, {BackgroundTransparency = math.max(0, baseTransparency - 0.12)})
-			if button:IsA("ImageButton") then
-				tween(button, 0.14, {ImageTransparency = 0.08})
+	local function render(record)
+		local gui = record.Gui
+		if not gui.Parent then return end
+		for property, value in pairs(record.Base) do gui[property] = value end
+		if record.Corner then record.Corner.CornerRadius = UDim.new(0, UI.Modern and record.Radius or 0) end
+		if record.Stroke then record.Stroke.Enabled = UI.Modern end
+		if record.Gradient then record.Gradient.Enabled = UI.Modern end
+		if record.Sheen then record.Sheen:Cancel() end
+		if record.Gradient and UI.Modern then record.Sheen:Play() end
+		if record.Reveal then record.Reveal.Scale = 1 end
+		if not UI.Modern then return end
+		if not record.ColorControl then
+			remember(record, "BackgroundColor3", modernColor(record.Base.BackgroundColor3 or gui.BackgroundColor3))
+			remember(record, "BorderSizePixel", 0)
+		end
+		if isText(gui) then
+			local header = gui == Title or gui.Name == "Title" or gui.Name == "PopupText"
+			remember(record, "Font", header and Enum.Font.GothamMedium or Enum.Font.Gotham)
+			remember(record, "TextColor3", modernColor(record.Base.TextColor3 or gui.TextColor3, true))
+			if gui:IsA("TextBox") then remember(record, "PlaceholderColor3", palette.Muted) end
+			if gui == Title then remember(record, "TextSize", 14) end
+			if gui.Name == "Title" and gui.Parent and gui.Parent.Name == "TopBar" then remember(record, "TextSize", 12) end
+			if gui == Cmdbar then remember(record, "TextSize", 16) end
+			if gui.Parent == CMDsF and gui:IsA("TextButton") then
+				remember(record, "TextSize", 14)
+				remember(record, "Size", UDim2.new(1, -8, 0, 24))
 			end
-		end)
-		button.MouseLeave:Connect(function()
-			tween(button, 0.22, {BackgroundTransparency = baseTransparency})
-			if button:IsA("ImageButton") then
-				tween(button, 0.22, {ImageTransparency = 0})
-			end
-		end)
-		button.MouseButton1Down:Connect(function()
-			tween(button, 0.08, {BackgroundColor3 = currentShade3})
-		end)
-		button.MouseButton1Up:Connect(function()
-			tween(button, 0.16, {BackgroundColor3 = baseColor})
-		end)
+		end
+		if gui:IsA("GuiButton") then remember(record, "AutoButtonColor", false) end
+		if gui:IsA("ScrollingFrame") then
+			remember(record, "ScrollBarThickness", math.min(4, gui.ScrollBarThickness))
+			remember(record, "ScrollBarImageColor3", palette.Accent)
+		end
+		if record.Stroke then
+			record.Stroke.Transparency = record.Interactive and 1 or 0.65
+			record.Stroke.Color = palette.Line
+			record.Stroke.Thickness = 1
+		end
 	end
-
-	for _, gui in ipairs(ScaledHolder:GetDescendants()) do
+	local function feedback(record, active, pressed)
+		if not UI.Alive or not UI.Modern or not record.Stroke then return end
+		animate(record.Stroke, {
+			Color = active and palette.Accent or palette.Line,
+			Transparency = active and (pressed and 0 or 0.15) or 1,
+			Thickness = pressed and 2 or (active and 1.3 or 1)
+		}, pressed and 0.09 or 0.2)
+	end
+	local function reveal(record)
+		if not UI.Alive or not UI.Modern or not record.Reveal or not record.Gui.Visible then return end
+		record.Reveal.Scale = 0.975
+		animate(record.Reveal, {Scale = 1}, 0.28)
+	end
+	local function register(gui)
+		if not UI.Alive or not gui:IsA("GuiObject") or UI.Records[gui] or gui.Name:sub(1, 6) == "INFUP_" then return end
+		-- Templates may carry cloned decorations. Rebuild only our own children.
+		for _, child in ipairs(gui:GetChildren()) do
+			if decoration(child) then child:Destroy() end
+		end
+		local record = {Gui = gui, Base = {}, Connections = {}, ColorControl = isColorControl(gui)}
+		UI.Records[gui] = record
+		record.Interactive = gui:IsA("GuiButton") or gui:IsA("TextBox")
+		local solid = gui.BackgroundTransparency < 0.95
+		local tiny = gui.Size.X.Scale == 0 and gui.Size.X.Offset <= 3 or gui.Size.Y.Scale == 0 and gui.Size.Y.Offset <= 3
+		if (solid or record.Interactive) and not tiny then
+			record.Radius = record.ColorControl and 3 or (gui == Holder and 10 or (record.Interactive and 5 or 7))
+			if not gui:FindFirstChildOfClass("UICorner") then
+				record.Corner = own(Instance.new("UICorner"), "Corner", gui)
+			end
+			if not gui:FindFirstChildOfClass("UIStroke") then record.Stroke = makeStroke(gui) end
+		end
+		local header = gui == Title or gui.Name == "TopBar" or gui.Name == "shadow"
+		if header and not gui:FindFirstChildOfClass("UIGradient") then
+			record.Gradient = own(Instance.new("UIGradient"), "Header", gui)
+			record.Gradient.Rotation = 16
+			record.Gradient.Color = ColorSequence.new(Color3.fromRGB(212, 225, 255), Color3.fromRGB(149, 179, 255))
+			record.Sheen = TweenService:Create(record.Gradient, TweenInfo.new(3.2, Enum.EasingStyle.Sine, Enum.EasingDirection.InOut, -1, true), {Offset = Vector2.new(0.22, 0)})
+		end
+		if gui.Parent == ScaledHolder and gui ~= Holder and gui ~= Tooltip and not gui:FindFirstChildOfClass("UIScale") then
+			record.Reveal = own(Instance.new("UIScale"), "Reveal", gui)
+			table.insert(record.Connections, gui:GetPropertyChangedSignal("Visible"):Connect(function() reveal(record) end))
+			-- Original popup motion controls Position; a separate scale adds depth.
+			local lastOpening = 0
+			table.insert(record.Connections, gui:GetPropertyChangedSignal("Position"):Connect(function()
+				local p = gui.Position
+				local inView = p.Y.Scale >= 0.2 or p.Y.Offset > 0 and p.Y.Offset < 500
+				if inView and not record.InView and os.clock() - lastOpening > 0.4 then
+					lastOpening = os.clock()
+					reveal(record)
+				end
+				record.InView = inView
+			end))
+		end
 		if gui:IsA("GuiButton") then
-			polishButton(gui)
+			table.insert(record.Connections, gui.MouseEnter:Connect(function() feedback(record, true) end))
+			table.insert(record.Connections, gui.MouseLeave:Connect(function() feedback(record, false) end))
+			table.insert(record.Connections, gui.InputBegan:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then feedback(record, true, true) end
+			end))
+			table.insert(record.Connections, gui.InputEnded:Connect(function(input)
+				if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then feedback(record, false) end
+			end))
+		elseif gui:IsA("TextBox") then
+			table.insert(record.Connections, gui.Focused:Connect(function() feedback(record, true) end))
+			table.insert(record.Connections, gui.FocusLost:Connect(function() feedback(record, false) end))
 		end
+		render(record)
 	end
 
-	-- Command bar focus gets a visible accent, making the active state obvious.
-	local commandStroke = Instance.new("UIStroke")
-	commandStroke.Name = "IYCommandFocus"
-	commandStroke.Color = currentShade3
-	commandStroke.Transparency = 1
-	commandStroke.Thickness = 1.5
-	commandStroke.Parent = Cmdbar
-	Cmdbar.Focused:Connect(function()
-		tween(commandStroke, 0.2, {Transparency = 0.08})
-		tween(Cmdbar, 0.2, {TextColor3 = Color3.fromRGB(245, 248, 255)})
-	end)
-	Cmdbar.FocusLost:Connect(function()
-		tween(commandStroke, 0.25, {Transparency = 1})
-		tween(Cmdbar, 0.25, {TextColor3 = currentText1})
-	end)
-
-	-- New command rows fade in when the list is rebuilt or filtered.
-	local function animateRow(row)
-		if not row:IsA("GuiObject") or row:GetAttribute("IYAnimated") then return end
-		row:SetAttribute("IYAnimated", true)
-		local transparency = (row:IsA("TextLabel") or row:IsA("TextButton")) and row.TextTransparency or nil
-		if transparency ~= nil then
-			row.TextTransparency = 1
-			tween(row, 0.24, {TextTransparency = transparency})
+	function UI:ThemeChanged(color, group)
+		local property = (group == text1 or group == text2) and "TextColor3" or (group == scroll and "ScrollBarImageColor3" or "BackgroundColor3")
+		for _, gui in pairs(group) do
+			local record = self.Records[gui]
+			if record then
+				record.Base[property] = color
+				if gui:IsA("TextBox") and property == "TextColor3" then record.Base.PlaceholderColor3 = color end
+				render(record)
+			end
 		end
-		if row:IsA("GuiButton") then polishButton(row) end
 	end
-	for _, row in ipairs(CMDsF:GetChildren()) do animateRow(row) end
-	CMDsF.ChildAdded:Connect(function(row)
-		task.defer(animateRow, row)
-	end)
-
-	-- A restrained title pulse keeps the compact panel feeling alive.
-	task.spawn(function()
-		while Holder and Holder.Parent do
-			tween(titleGradient, 1.4, {Offset = Vector2.new(0.35, 0)}, Enum.EasingStyle.Sine)
-			task.wait(1.4)
-			tween(titleGradient, 1.4, {Offset = Vector2.new(-0.35, 0)}, Enum.EasingStyle.Sine)
-			task.wait(1.4)
+	function UI:SetModern(enabled, save)
+		if not self.Alive then return end
+		self.Modern = enabled == true
+		for instance, motion in pairs(self.Tweens) do motion:Cancel(); self.Tweens[instance] = nil end
+		for _, record in pairs(self.Records) do render(record) end
+		self.SwitchLabel.Text = self.Modern and "Modern interface" or "Classic interface"
+		self.SwitchLabel.Font = self.Modern and Enum.Font.Gotham or Enum.Font.SourceSans
+		self.SwitchLabel.TextColor3 = self.Modern and palette.Text or currentText1
+		self.Track.BackgroundColor3 = self.Modern and palette.Accent or Color3.fromRGB(78, 78, 79)
+		animate(self.Knob, {Position = UDim2.fromOffset(self.Modern and 19 or 3, 3)}, 0.18)
+		if save ~= false then
+			pcall(function()
+				if writefile and makefolder and isfolder then
+					if not isfolder("infiniteyield") then makefolder("infiniteyield") end
+					writefile(styleFile, HttpService:JSONEncode({modern = self.Modern}))
+				end
+			end)
 		end
-	end)
+	end
+	function UI:Destroy()
+		if not self.Alive then return end
+		self.Alive = false
+		for _, connection in ipairs(self.Connections) do connection:Disconnect() end
+		for _, motion in pairs(self.Tweens) do motion:Cancel() end
+		for gui, record in pairs(self.Records) do
+			for _, connection in ipairs(record.Connections) do connection:Disconnect() end
+			if record.Sheen then record.Sheen:Cancel() end
+			if gui.Parent then
+				for property, value in pairs(record.Base) do
+					gui[property] = value
+					gui:SetAttribute("INFUP_Base_" .. property, nil)
+					gui:SetAttribute("INFUP_Applied_" .. property, nil)
+				end
+				for _, child in ipairs(gui:GetChildren()) do
+					if decoration(child) then child:Destroy() end
+				end
+			end
+		end
+		for gui, position in pairs(self.SettingsPositions) do if gui.Parent then gui.Position = position end end
+		SettingsHolder.CanvasSize = self.SettingsCanvas
+		self.Switch:Destroy()
+		table.clear(self.Records)
+		table.clear(self.Connections)
+		table.clear(self.Tweens)
+		if INFUPUI == self then INFUPUI = nil end
+		if getgenv().INF_UP_UI == self then getgenv().INF_UP_UI = nil end
+	end
+
+	-- One style switch, placed at the top of Settings.
+	UI.SettingsPositions = {}
+	UI.SettingsCanvas = SettingsHolder.CanvasSize
+	for _, child in ipairs(SettingsHolder:GetChildren()) do
+		if child:IsA("GuiObject") then
+			UI.SettingsPositions[child] = child.Position
+			child.Position = child.Position + UDim2.fromOffset(0, 34)
+		end
+	end
+	SettingsHolder.CanvasSize = SettingsHolder.CanvasSize + UDim2.fromOffset(0, 34)
+	local switch = Instance.new("TextButton")
+	switch.Size = UDim2.new(1, -10, 0, 28)
+	switch.Position = UDim2.fromOffset(5, 3)
+	switch.BackgroundTransparency = 1
+	switch.Text = ""
+	switch.ZIndex = 10
+	UI.Switch = own(switch, "StyleRow", SettingsHolder)
+	UI.Toggle = switch
+	local label = Instance.new("TextLabel")
+	label.Size = UDim2.new(1, -48, 1, 0)
+	label.BackgroundTransparency = 1
+	label.TextSize = 13
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextColor3 = palette.Text
+	label.ZIndex = 10
+	UI.SwitchLabel = own(label, "Label", switch)
+	local track = Instance.new("Frame")
+	track.Position = UDim2.new(1, -38, 0.5, -10)
+	track.Size = UDim2.fromOffset(36, 20)
+	track.BorderSizePixel = 0
+	track.ZIndex = 10
+	UI.Track = own(track, "Track", switch)
+	local round = own(Instance.new("UICorner"), "Corner", track)
+	round.CornerRadius = UDim.new(1, 0)
+	local knob = Instance.new("Frame")
+	knob.Size = UDim2.fromOffset(14, 14)
+	knob.BackgroundColor3 = Color3.new(1, 1, 1)
+	knob.BorderSizePixel = 0
+	knob.ZIndex = 11
+	UI.Knob = own(knob, "Knob", track)
+	local knobRound = own(Instance.new("UICorner"), "Corner", knob)
+	knobRound.CornerRadius = UDim.new(1, 0)
+	table.insert(UI.Connections, switch.Activated:Connect(function() UI:SetModern(not UI.Modern) end))
+
+	for _, gui in ipairs(ScaledHolder:GetDescendants()) do register(gui) end
+	table.insert(UI.Connections, ScaledHolder.DescendantAdded:Connect(function(gui)
+		if gui:IsA("GuiObject") then task.defer(function()
+			if UI.Alive and gui:IsDescendantOf(ScaledHolder) then register(gui) end
+		end) end
+	end))
+	table.insert(UI.Connections, ScaledHolder.DescendantRemoving:Connect(function(gui)
+		local record = UI.Records[gui]
+		if not record then return end
+		task.defer(function()
+			if not UI.Alive or gui:IsDescendantOf(ScaledHolder) then return end
+			for _, connection in ipairs(record.Connections) do connection:Disconnect() end
+			if record.Sheen then record.Sheen:Cancel() end
+			for _, instance in ipairs({record.Stroke, record.Reveal}) do
+				if UI.Tweens[instance] then UI.Tweens[instance]:Cancel(); UI.Tweens[instance] = nil end
+			end
+			UI.Records[gui] = nil
+		end)
+	end))
+	table.insert(UI.Connections, ScaledHolder.Destroying:Connect(function() UI:Destroy() end))
+	UI:SetModern(UI.Modern, false)
 end
+-- INF UP UI END
 
 -- Events
 eventEditor.RegisterEvent("OnExecute")
