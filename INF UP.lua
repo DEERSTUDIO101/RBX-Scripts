@@ -92,7 +92,6 @@ TextService = Services.TextService
 TextChatService = Services.TextChatService
 CaptureService = Services.CaptureService
 VoiceChatService = Services.VoiceChatService
-SocialService = Services.SocialService
 
 PlayerGui = cloneref(Players.LocalPlayer:FindFirstChildWhichIsA("PlayerGui"))
 COREGUI = Services.CoreGui or PlayerGui
@@ -4624,7 +4623,6 @@ CMDs[#CMDs + 1] = {NAME = 'muteallvoices / muteallvcs', DESC = 'Mutes voice chat
 CMDs[#CMDs + 1] = {NAME = 'unmuteallvoices / unmuteallvcs', DESC = 'Unmutes voice chat for all players'}
 CMDs[#CMDs + 1] = {NAME = 'mutevc [player]', DESC = 'Mutes the voice chat of a player'}
 CMDs[#CMDs + 1] = {NAME = 'unmutevc [player]', DESC = 'Unmutes the voice chat of a player'}
-CMDs[#CMDs + 1] = {NAME = 'phonebook / call', DESC = 'Prompts the Roblox phonebook UI to let you call your friends. Needs voice chat enabled'}
 CMDs[#CMDs + 1] = {NAME = '', DESC = ''}
 CMDs[#CMDs + 1] = {NAME = 'esp', DESC = 'View all players and their status'}
 CMDs[#CMDs + 1] = {NAME = 'espteam', DESC = 'ESP but teammates are green and bad guys are red'}
@@ -4693,7 +4691,7 @@ CMDs[#CMDs + 1] = {NAME = 'fireproximityprompts / firepp [name]', DESC = 'Uses a
 CMDs[#CMDs + 1] = {NAME = 'instantproximityprompts / instantpp', DESC = 'Disable the cooldown for proximity prompts'}
 CMDs[#CMDs + 1] = {NAME = 'uninstantproximityprompts / uninstantpp', DESC = 'Undo the cooldown removal'}
 CMDs[#CMDs + 1] = {NAME = 'tpunanchored / tpua [player]', DESC = 'Teleports unanchored parts to a player'}
-CMDs[#CMDs + 1] = {NAME = 'animsunanchored / freezeua', DESC = 'Freezes unanchored parts'}
+CMDs[#CMDs + 1] = {NAME = 'freezeunanchored / freezeua', DESC = 'Freezes unanchored parts'}
 CMDs[#CMDs + 1] = {NAME = 'thawunanchored / thawua / unfreezeua', DESC = 'Thaws unanchored parts'}
 CMDs[#CMDs + 1] = {NAME = 'removeterrain / rterrain / noterrain', DESC = 'Removes all terrain'}
 CMDs[#CMDs + 1] = {NAME = 'clearnilinstances / nonilinstances / cni', DESC = 'Removes nil instances'}
@@ -5080,6 +5078,7 @@ function getstring(begin, args)
 end
 
 findCmd=function(cmd_name)
+	if type(cmd_name) ~= "string" or not cmd_name:find("%S") then return nil end
 	for i,v in pairs(cmds)do
 		if v.NAME:lower()==cmd_name:lower() or FindInTable(v.ALIAS,cmd_name:lower()) then
 			return v
@@ -5207,7 +5206,7 @@ function removecmd(cmd)
 			if cmds[i].NAME == cmd or FindInTable(cmds[i].ALIAS,cmd) then
 				table.remove(cmds, i)
 				for a,c in pairs(CMDsF:GetChildren()) do
-					if string.find(c.Text, "^"..cmd.."$") or string.find(c.Text, "^"..cmd.." ") or string.find(c.Text, " "..cmd.."$") or string.find(c.Text, " "..cmd.." ") then
+					if c:IsA("TextButton") and (string.find(c.Text, "^"..cmd.."$") or string.find(c.Text, "^"..cmd.." ") or string.find(c.Text, " "..cmd.."$") or string.find(c.Text, " "..cmd.." ")) then
 						c.TextTransparency = 0.7
 						c.MouseButton1Click:Connect(function()
 							notify(c.Text, "Command has been disabled by you or a plugin")
@@ -6508,7 +6507,7 @@ local TeleportCheck = false
 Players.LocalPlayer.OnTeleport:Connect(function(State)
 	if KeepInfYield and (not TeleportCheck) and queueteleport then
 		TeleportCheck = true
-		queueteleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source'))()")
+		queueteleport("loadstring(game:HttpGet('https://raw.githubusercontent.com/DEERSTUDIO101/RBX-Scripts/main/INF%20UP.lua'))()")
 	end
 end)
 
@@ -7544,15 +7543,26 @@ addcmd('setwaypoint',{'swp','setwp','spos','saveposition','savepos'},function(ar
 	updatesaves()
 end)
 
-addcmd('waypointpos',{'wpp','setwaypointposition','setpos','setwaypoint','setwaypointpos'},function(args, speaker)
-	local WPName = tostring(getstring(1, args))
-	if getRoot(speaker.Character) then
-		notify('Modified Waypoints',"Created waypoint: "..getstring(1, args))
-		WayPoints[#WayPoints + 1] = {NAME = WPName, COORD = {args[2], args[3], args[4]}, GAME = PlaceId}
-		if AllWaypoints ~= nil then
-			AllWaypoints[#AllWaypoints + 1] = {NAME = WPName, COORD = {args[2], args[3], args[4]}, GAME = PlaceId}
+addcmd('waypointpos',{'wpp','setwaypointposition','setpos','setwaypointpos'},function(args, speaker)
+	local count = #args
+	if count < 4 then
+		return notify('Waypoint Error', 'Usage: waypointpos [name] [X Y Z]')
+	end
+	local coords = {}
+	for i = count - 2, count do
+		local value = tonumber(args[i])
+		if not value or value ~= value or math.abs(value) == math.huge then
+			return notify('Waypoint Error', 'Coordinates must be finite numbers')
 		end
-	end	
+		coords[#coords + 1] = value
+	end
+	local WPName = table.concat(args, ' ', 1, count - 3)
+	if not WPName:find('%S') then return notify('Waypoint Error', 'Enter a waypoint name') end
+	WayPoints[#WayPoints + 1] = {NAME = WPName, COORD = coords, GAME = PlaceId}
+	if AllWaypoints ~= nil then
+		AllWaypoints[#AllWaypoints + 1] = {NAME = WPName, COORD = {coords[1], coords[2], coords[3]}, GAME = PlaceId}
+	end
+	notify('Modified Waypoints', 'Created waypoint: ' .. WPName)
 	refreshwaypoints()
 	updatesaves()
 end)
@@ -11621,68 +11631,56 @@ addcmd('droppabletools',{},function(args, speaker)
 	end
 end)
 
-local currentToolSize = ""
-local currentGripPos = ""
-addcmd('reach',{},function(args, speaker)
-	execCmd('unreach')
-	wait()
-	for i,v in pairs(speaker.Character:GetDescendants()) do
-		if v:IsA("Tool") then
-			if args[1] then
-				currentToolSize = v.Handle.Size
-				currentGripPos = v.GripPos
-				local a = Instance.new("SelectionBox")
-				a.Name = "SelectionBoxCreated"
-				a.Parent = v.Handle
-				a.Adornee = v.Handle
-				v.Handle.Massless = true
-				v.Handle.Size = Vector3.new(0.5,0.5,args[1])
-				v.GripPos = Vector3.new(0,0,0)
-				speaker.Character:FindFirstChildOfClass('Humanoid'):UnequipTools()
-			else
-				currentToolSize = v.Handle.Size
-				currentGripPos = v.GripPos
-				local a = Instance.new("SelectionBox")
-				a.Name = "SelectionBoxCreated"
-				a.Parent = v.Handle
-				a.Adornee = v.Handle
-				v.Handle.Massless = true
-				v.Handle.Size = Vector3.new(0.5,0.5,60)
-				v.GripPos = Vector3.new(0,0,0)
-				speaker.Character:FindFirstChildOfClass('Humanoid'):UnequipTools()
+local reachToolStates = {}
+local function restoreReachTools()
+	for tool, saved in pairs(reachToolStates) do
+		-- The tool may now be in the backpack after UnequipTools.
+		pcall(function() saved.Handle.Size = saved.Size; saved.Handle.Massless = saved.Massless end)
+		pcall(function() tool.GripPos = saved.Grip end)
+		if saved.Box then saved.Box:Destroy() end
+		reachToolStates[tool] = nil
+	end
+end
+
+local function applyToolReach(args, speaker, box)
+	local size = args[1] == nil and 60 or tonumber(args[1])
+	if not size or size ~= size or size <= 0 or size == math.huge then
+		return notify('Reach Error', 'Enter a positive, finite size')
+	end
+	restoreReachTools()
+	local character = speaker and speaker.Character
+	if not character then return end
+	local changed = false
+	for _, tool in ipairs(character:GetDescendants()) do
+		if tool:IsA('Tool') then
+			local handle = tool:FindFirstChild('Handle')
+			if handle and handle:IsA('BasePart') then
+				local selection = Instance.new('SelectionBox')
+				selection.Name = 'SelectionBoxCreated'
+				selection.Adornee = handle
+				selection.Parent = handle
+				reachToolStates[tool] = {Handle = handle, Size = handle.Size, Grip = tool.GripPos, Massless = handle.Massless, Box = selection}
+				handle.Massless = true
+				handle.Size = box and Vector3.new(size, size, size) or Vector3.new(0.5, 0.5, size)
+				tool.GripPos = Vector3.zero
+				changed = true
 			end
 		end
 	end
+	local humanoid = character:FindFirstChildOfClass('Humanoid')
+	if changed and humanoid then humanoid:UnequipTools() end
+end
+
+addcmd('reach',{},function(args, speaker)
+	applyToolReach(args, speaker, false)
 end)
 
-addcmd("boxreach", {}, function(args, speaker)
-	execCmd("unreach")
-	wait()
-	for i, v in pairs(speaker.Character:GetDescendants()) do
-		if v:IsA("Tool") then
-			local size = tonumber(args[1]) or 60
-			currentToolSize = v.Handle.Size
-			currentGripPos = v.GripPos
-			local a = Instance.new("SelectionBox")
-			a.Name = "SelectionBoxCreated"
-			a.Parent = v.Handle
-			a.Adornee = v.Handle
-			v.Handle.Massless = true
-			v.Handle.Size = Vector3.new(size, size, size)
-			v.GripPos = Vector3.new(0, 0, 0)
-			speaker.Character:FindFirstChildOfClass("Humanoid"):UnequipTools()
-		end
-	end
+addcmd('boxreach',{},function(args, speaker)
+	applyToolReach(args, speaker, true)
 end)
 
 addcmd('unreach',{'noreach','unboxreach'},function(args, speaker)
-	for i,v in pairs(speaker.Character:GetDescendants()) do
-		if v:IsA("Tool") then
-			v.Handle.Size = currentToolSize
-			v.GripPos = currentGripPos
-			v.Handle.SelectionBoxCreated:Destroy()
-		end
-	end
+	restoreReachTools()
 end)
 
 addcmd('grippos',{},function(args, speaker)
@@ -12822,17 +12820,6 @@ addcmd("unmutevc", {}, function(args, speaker)
 	for _, plr in getPlayer(args[1], speaker) do
 		if Players[plr] == speaker then continue end
 		Services.VoiceChatInternal:SubscribePause(Players[plr].UserId, false)
-	end
-end)
-
-addcmd("phonebook", {"call"}, function(args, speaker)
-	local success, canInvite = pcall(function()
-		return SocialService:CanSendCallInviteAsync(speaker)
-	end)
-	if success and canInvite then
-		SocialService:PromptPhoneBook(speaker, "")
-	else
-		notify("Phonebook", "It seems you're not able to call anyone. Sorry!")
 	end
 end)
 
