@@ -13059,6 +13059,342 @@ addcmd('reloadplugin',{},function(args, speaker)
 	addPlugin(pluginName)
 end)
 
+-- BEGIN IY PLUGIN STORE INTEGRATION
+do
+    if table.find(PluginsTable, 'IYPluginStore.iy') then deletePlugin('IYPluginStore.iy') end
+    local makeStore = function()
+-- IY Plugin Store v1.1.0
+local Http = game:GetService('HttpService')
+local Players = game:GetService('Players')
+local rootEnv = getgenv()
+local api = getfenv()
+if type(api.addPlugin) ~= 'function' and getgc then
+    for _, fn in ipairs(getgc()) do
+        if type(fn) == 'function' and debug.info(fn, 'n') == 'addPlugin' then
+            local env = getfenv(fn)
+            if type(env.deletePlugin) == 'function' then api = env break end
+        end
+    end
+end
+assert(type(api.addPlugin) == 'function', 'Load Infinite Yield before IY Plugin Store.')
+if rootEnv.IYPluginStore and rootEnv.IYPluginStore.Destroy then rootEnv.IYPluginStore.Destroy() end
+local Store = {Version = '1.1.0', Catalog = {}, Filtered = {}, Page = 1, Busy = false, Connections = {}}
+rootEnv.IYPluginStore = Store
+local configFile, indexFile, cacheFile = 'IYPluginStore.config.json', 'IYPluginStore.installed.json', 'IYPluginStore.catalog.json'
+local function readJSON(path, fallback)
+    local ok, value = pcall(function() return Http:JSONDecode(readfile(path)) end)
+    return ok and type(value) == 'table' and value or fallback
+end
+local defaultCatalogURL = 'https://raw.githubusercontent.com/DEERSTUDIO101/IY-PLUGIN-STORE/main/data/catalog.json'
+Store.Config = readJSON(configFile, {CatalogURL = defaultCatalogURL})
+if type(Store.Config.CatalogURL) ~= 'string' or Store.Config.CatalogURL == '' then
+    Store.Config.CatalogURL = defaultCatalogURL
+end
+Store.Installed = readJSON(indexFile, {})
+local function save(path, value) writefile(path, Http:JSONEncode(value)) end
+local function notify(message) if api.notify then api.notify('IY Plugin Store', tostring(message)) end end
+local function connect(signal, fn) local c = signal:Connect(fn); table.insert(Store.Connections, c); return c end
+local function enabled(file) return table.find(api.PluginsTable or {}, file) ~= nil end
+local function exists(file) local ok, result = pcall(isfile, file); return ok and result end
+local function getURL(url)
+    assert(type(url) == 'string' and url:match('^https://'), 'An HTTPS URL is required.')
+    local body = game:HttpGet(url)
+    assert(type(body) == 'string' and #body > 0, 'The server returned an empty response.')
+    return body
+end
+local function normalize(data)
+    assert(data.schemaVersion == 1 and type(data.plugins) == 'table', 'Unsupported catalog format.')
+    local entries, ids = {}, {}
+    for _, p in ipairs(data.plugins) do
+        if type(p) == 'table' and type(p.id) == 'string' and p.id:match('^[%w_%-]+$') and not ids[p.id]
+            and type(p.name) == 'string' and type(p.url) == 'string' and p.url:match('^https://')
+            and type(p.filename) == 'string' and p.filename:lower():match('%.iy$') then
+            ids[p.id] = true
+            table.insert(entries, {id=p.id, name=p.name, filename=p.filename, description=tostring(p.description or ''),
+                author=tostring(p.author or 'Community'), version=tostring(p.version or '1'), url=p.url,
+                category=tostring(p.category or 'Community'), source=tostring(p.source or '')})
+        end
+    end
+    assert(#entries > 0, 'The catalog contains no installable plugins.')
+    return entries
+end
+function Store.Refresh()
+    local data, networkError
+    if Store.Config.CatalogURL ~= '' then
+        local ok, result = pcall(function() local d=Http:JSONDecode(getURL(Store.Config.CatalogURL)); normalize(d); return d end)
+        if ok then data=result; pcall(save, cacheFile, data) else networkError=result end
+    end
+    data = data or readJSON(cacheFile, {})
+    Store.Catalog = normalize(data)
+    Store.Offline = networkError ~= nil
+    if Store.Render then Store.Render() end
+    if networkError then notify('Using the saved catalog. Refresh failed: '..tostring(networkError)) end
+    return #Store.Catalog
+end
+local function find(id)
+    for _, p in ipairs(Store.Catalog) do if p.id == id then return p end end
+    error('Plugin not found. Refresh the catalog and copy its install command from the website.')
+end
+local function localFile(p) return 'IYStore_'..p.id..'.iy' end
+function Store.Install(id)
+    local p = find(id)
+    local file = localFile(p)
+    assert(not enabled(file), 'Disable this plugin before updating its file.')
+    local source = getURL(p.url)
+    assert(#source <= 4*1024*1024, 'Plugin exceeds the 4 MB file limit.')
+    local compiled, syntaxError = loadstring(source, '@'..file)
+    assert(compiled, 'Invalid plugin syntax: '..tostring(syntaxError))
+    -- Compilation checks syntax without executing the downloaded plugin.
+    local previous = exists(file) and readfile(file) or nil
+    if previous then writefile(file..'.bak', previous) end
+    local oldRecord = Store.Installed[id]
+    local ok, err = pcall(function()
+        writefile(file, source)
+        assert(readfile(file) == source, 'Downloaded file could not be verified after writing.')
+        Store.Installed[id] = {file=file, version=p.version, name=p.name, url=p.url}
+        save(indexFile, Store.Installed)
+    end)
+    if not ok then
+        Store.Installed[id] = oldRecord
+        if previous then pcall(writefile, file, previous) elseif delfile then pcall(delfile, file) end
+        error(err)
+    end
+    notify(p.name..' installed. Select Enable when you want to load it.')
+    return file
+end
+function Store.Enable(id)
+    local record = Store.Installed[id]
+    assert(record and exists(record.file), 'Install this plugin first.')
+    if not enabled(record.file) then api.addPlugin(record.file) end
+    assert(enabled(record.file), 'IY could not load this plugin. Check the executor console.')
+end
+function Store.Disable(id)
+    local record = Store.Installed[id]
+    if record and enabled(record.file) then api.deletePlugin(record.file) end
+end
+function Store.Remove(id)
+    local record = Store.Installed[id]
+    assert(record, 'This plugin is not installed.')
+    assert(type(delfile) == 'function', 'Your executor does not support deleting files.')
+    Store.Disable(id)
+    if exists(record.file) then delfile(record.file) end
+    Store.Installed[id] = nil
+    save(indexFile, Store.Installed)
+    notify(record.name..' removed. Effects from a running plugin may require rejoining.')
+end
+local function run(fn)
+    if Store.Busy then return end
+    Store.Busy = true
+    task.spawn(function()
+        local ok, err = pcall(fn)
+        Store.Busy = false
+        if not ok then notify(err) end
+        if Store.Render then Store.Render() end
+    end)
+end
+local function create(class, parent, properties)
+    local item = Instance.new(class)
+    for k,v in pairs(properties or {}) do item[k] = v end
+    item.Parent = parent
+    return item
+end
+function Store.Open()
+    if Store.Gui then Store.Gui.Enabled=true; Store.Render(); return end
+    local bg = Color3.fromRGB(20,23,27)
+    local panel = Color3.fromRGB(31,35,40)
+    local text = Color3.fromRGB(235,239,241)
+    local muted = Color3.fromRGB(153,163,175)
+    local accent = Color3.fromRGB(181,243,108)
+    local gui = create('ScreenGui', (gethui and gethui()) or game:GetService('CoreGui'), {Name='IYPluginStore',ResetOnSpawn=false,DisplayOrder=100,IgnoreGuiInset=true,ZIndexBehavior=Enum.ZIndexBehavior.Sibling})
+    Store.Gui = gui
+    local window = create('Frame',gui,{Name='Window',Size=UDim2.fromOffset(740,500),Position=UDim2.fromScale(.5,.5),AnchorPoint=Vector2.new(.5,.5),BackgroundColor3=bg,BorderSizePixel=0})
+    create('UICorner',window,{CornerRadius=UDim.new(0,12)})
+    create('UIStroke',window,{Color=Color3.fromRGB(65,76,57)})
+    local scale = create('UIScale',window,{})
+    local function label(parent,name,value,x,y,w,h,color,size)
+        return create('TextLabel',parent,{Name=name,Text=value,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),BackgroundTransparency=1,TextColor3=color or text,FontFace=Font.new("rbxasset://fonts/families/Montserrat.json",Enum.FontWeight.Medium),TextSize=size or 13,TextXAlignment=Enum.TextXAlignment.Left,TextWrapped=true})
+    end
+    local function button(parent,name,value,x,y,w,h,fn)
+        local b=create('TextButton',parent,{Name=name,Text=value,Position=UDim2.fromOffset(x,y),Size=UDim2.fromOffset(w,h),BackgroundColor3=panel,TextColor3=text,FontFace=Font.new("rbxasset://fonts/families/Montserrat.json",Enum.FontWeight.Medium),TextSize=12,BorderSizePixel=0,AutoButtonColor=true})
+        create('UICorner',b,{CornerRadius=UDim.new(0,6)})
+        connect(b.Activated,fn)
+        return b
+    end
+    local title=label(window,'Title','IY  /  PLUGIN STORE',22,12,580,38,accent,18)
+    title.FontFace=Font.new('rbxasset://fonts/families/Montserrat.json',Enum.FontWeight.Bold)
+    -- Keep the responsive window centered so dragging cannot strand it off-screen.
+    button(window,'Close','×',688,16,30,30,function() gui.Enabled=false end)
+    local search=create('TextBox',window,{Name='Search',Text='',PlaceholderText='Search plugins, creators, commands...',Position=UDim2.fromOffset(20,65),Size=UDim2.fromOffset(540,36),BackgroundColor3=panel,TextColor3=text,PlaceholderColor3=muted,ClearTextOnFocus=false,FontFace=Font.new("rbxasset://fonts/families/Montserrat.json",Enum.FontWeight.Medium),TextSize=12,BorderSizePixel=0})
+    create('UICorner',search,{CornerRadius=UDim.new(0,6)})
+    button(window,'Refresh','Refresh',572,65,148,36,function() run(Store.Refresh) end)
+    local count=label(window,'Count','Loading catalog...',20,108,700,25,muted,11)
+    local list=create('ScrollingFrame',window,{Name='Plugins',Position=UDim2.fromOffset(20,140),Size=UDim2.fromOffset(310,300),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,CanvasSize=UDim2.new()})
+    local detail=create('ScrollingFrame',window,{ScrollBarThickness=4,CanvasSize=UDim2.new(),Name='Details',Position=UDim2.fromOffset(345,140),Size=UDim2.fromOffset(375,300),BackgroundColor3=panel,BorderSizePixel=0})
+    create('UICorner',detail,{CornerRadius=UDim.new(0,8)})
+    local name=label(detail,'PluginName','Choose a plugin',15,12,345,40,text,18)
+    local author=label(detail,'Author','Browse the collection on the left.',15,55,345,28,muted,11)
+    local desc=create('ScrollingFrame',detail,{Name='DescriptionScroll',Position=UDim2.fromOffset(15,90),Size=UDim2.fromOffset(345,105),BackgroundTransparency=1,BorderSizePixel=0,ScrollBarThickness=3,CanvasSize=UDim2.new(),AutomaticCanvasSize=Enum.AutomaticSize.Y})
+    local description=label(desc,'Description','',0,0,330,0,muted,12)
+    description.AutomaticSize=Enum.AutomaticSize.Y
+    description.TextYAlignment=Enum.TextYAlignment.Top
+    local status=label(detail,'Status','',15,204,345,22,accent,11)
+    local install,enable,remove,preview
+    install=button(detail,'Install','Install',15,237,105,32,function() if Store.Selected then run(function() Store.Install(Store.Selected.id) end) end end)
+    enable=button(detail,'Enable','Enable',130,237,105,32,function() if Store.Selected then run(function() local p=Store.Selected;local r=Store.Installed[p.id];if r and enabled(r.file) then Store.Disable(p.id) else Store.Enable(p.id) end end) end end)
+    remove=button(detail,'Remove','Remove',245,237,115,32,function() if Store.Selected then run(function() Store.Remove(Store.Selected.id) end) end end)
+    preview=button(detail,'Preview','View source',15,275,345,21,function()
+        if not Store.Selected then return end
+        local p=Store.Selected
+        run(function()
+            local source=getURL(p.url)
+            local overlay=create('Frame',window,{Name='SourcePreview',Size=UDim2.fromScale(1,1),BackgroundColor3=bg,ZIndex=5})
+            local scroll=create('ScrollingFrame',overlay,{Position=UDim2.fromOffset(15,64),Size=UDim2.new(1,-30,1,-79),BackgroundColor3=panel,BorderSizePixel=0,AutomaticCanvasSize=Enum.AutomaticSize.Y,CanvasSize=UDim2.new(),ScrollBarThickness=5,ZIndex=6})
+            create('TextBox',scroll,{Text=source:sub(1,200000),Size=UDim2.new(1,-12,0,0),AutomaticSize=Enum.AutomaticSize.Y,TextEditable=false,ClearTextOnFocus=false,MultiLine=true,TextWrapped=true,TextXAlignment=Enum.TextXAlignment.Left,TextYAlignment=Enum.TextYAlignment.Top,BackgroundTransparency=1,TextColor3=text,Font=Enum.Font.Code,TextSize=12,ZIndex=6})
+            local close=button(overlay,'CloseSource','Close source preview',15,10,710,44,function() overlay:Destroy() end);close.Size=UDim2.new(1,-30,0,44);close.ZIndex=7
+        end)
+    end)
+    local pageLabel=label(window,'Page','',225,450,285,30,muted,11);pageLabel.TextXAlignment=Enum.TextXAlignment.Center
+    button(window,'Previous','Previous',20,450,120,30,function() Store.Page=math.max(1,Store.Page-1);Store.Render() end)
+    button(window,'Next','Next',600,450,120,30,function() Store.Page=math.min(Store.Pages,Store.Page+1);Store.Render() end)
+    local back=button(window,'Back','Back',16,14,65,42,function() Store.ShowDetails=false;Store.Render() end)
+    name.FontFace=Font.new('rbxasset://fonts/families/Montserrat.json',Enum.FontWeight.Bold)
+    function Store.ApplyLayout(viewport)
+        local width=math.max(240,math.min(780,viewport.X-24))
+        local height=math.max(260,math.min(580,viewport.Y-24))
+        local mobile=width<650
+        Store.Mobile=mobile
+        Store.ListWidth=mobile and width-32 or math.floor((width-48)*.43)
+        window.Size=UDim2.fromOffset(width,height)
+        scale.Scale=1
+        local function box(obj,x,y,w,h) obj.Position=UDim2.fromOffset(x,y);obj.Size=UDim2.fromOffset(w,h) end
+        local showDetails=mobile and Store.ShowDetails==true and Store.Selected~=nil
+        back.Visible=showDetails==true
+        box(title,showDetails and 92 or 20,12,width-(showDetails and 156 or 84),44)
+        title.TextSize=mobile and 16 or 20
+        box(window.Close,width-60,12,44,44)
+        box(search,16,70,width-132,44)
+        search.TextSize=14
+        search.PlaceholderText=mobile and 'Search plugins...' or 'Search plugins, creators, commands...'
+        box(window.Refresh,width-106,70,90,44)
+        box(count,16,119,width-32,28)
+        count.TextSize=12
+        local areaHeight=height-212
+        box(list,16,153,Store.ListWidth,areaHeight)
+        list.Visible=not showDetails
+        local detailWidth=mobile and width-32 or width-48-Store.ListWidth
+        box(detail,mobile and 16 or 32+Store.ListWidth,153,detailWidth,areaHeight)
+        detail.Visible=not mobile or showDetails
+        local inner=detailWidth-32
+        local contentHeight=math.max(365,areaHeight)
+        detail.CanvasSize=UDim2.fromOffset(0,contentHeight)
+        box(name,16,12,inner,48);name.TextSize=19
+        box(author,16,64,inner,32);author.TextSize=12
+        box(desc,16,105,inner,contentHeight-249)
+        description.Size=UDim2.fromOffset(inner-12,0);description.TextSize=14
+        box(status,16,contentHeight-135,inner,32);status.TextSize=12
+        local bw=(inner-16)/3
+        box(install,16,contentHeight-94,bw,44)
+        box(enable,24+bw,contentHeight-94,bw,44)
+        box(remove,32+2*bw,contentHeight-94,bw,44)
+        box(preview,16,contentHeight-43,inner,36)
+        box(window.Previous,16,height-49,96,44)
+        box(window.Next,width-112,height-49,96,44)
+        box(pageLabel,116,height-49,width-232,44)
+        return {mobile=mobile,width=width,height=height,listWidth=Store.ListWidth,detailWidth=detailWidth}
+    end
+    local function resize()
+        local camera=workspace.CurrentCamera
+        Store.ApplyLayout(camera and camera.ViewportSize or Vector2.new(1280,720))
+        if Store.Render then Store.Render() end
+    end
+    connect(workspace:GetPropertyChangedSignal('CurrentCamera'),function()
+        if Store.CameraConnection then Store.CameraConnection:Disconnect() end
+        if workspace.CurrentCamera then Store.CameraConnection=connect(workspace.CurrentCamera:GetPropertyChangedSignal('ViewportSize'),resize) end
+        resize()
+    end)
+    if workspace.CurrentCamera then Store.CameraConnection=connect(workspace.CurrentCamera:GetPropertyChangedSignal('ViewportSize'),resize) end
+    Store.ApplyLayout(workspace.CurrentCamera and workspace.CurrentCamera.ViewportSize or Vector2.new(1280,720))
+    local rowConnections={}
+    function Store.Render()
+        if not gui.Parent then return end
+        list.Visible=not (Store.Mobile and Store.ShowDetails and Store.Selected~=nil)
+        detail.Visible=not Store.Mobile or (Store.ShowDetails==true and Store.Selected~=nil)
+        back.Visible=Store.Mobile and Store.ShowDetails==true and Store.Selected~=nil
+        title.Position=UDim2.fromOffset(back.Visible and 92 or 20,12)
+        title.Size=UDim2.fromOffset(window.Size.X.Offset-(back.Visible and 156 or 84),44)
+        local q=search.Text:lower(); local filtered={}
+        for _,p in ipairs(Store.Catalog) do if (p.name..' '..p.author..' '..p.description):lower():find(q,1,true) then table.insert(filtered,p) end end
+        Store.Filtered=filtered;Store.Pages=math.max(1,math.ceil(#filtered/12));Store.Page=math.clamp(Store.Page,1,Store.Pages)
+        count.Text=string.format('%d plugins  /  %d results%s%s',#Store.Catalog,#filtered,Store.Offline and '  /  saved catalog' or '',Store.Busy and '  /  working...' or '')
+        pageLabel.Text=string.format('Page %d of %d',Store.Page,Store.Pages)
+        for _,c in ipairs(rowConnections) do c:Disconnect() end;table.clear(rowConnections);list:ClearAllChildren()
+        for i=(Store.Page-1)*12+1,math.min(Store.Page*12,#filtered) do
+            local p=filtered[i];local y=(i-(Store.Page-1)*12-1)*68
+            local row=create('TextButton',list,{Name=p.id,Text='',Position=UDim2.fromOffset(0,y),Size=UDim2.new(1,-6,0,60),BackgroundColor3=panel,BorderSizePixel=0})
+            create('UICorner',row,{CornerRadius=UDim.new(0,6)})
+            label(row,'Name',p.name,12,5,Store.ListWidth-34,27,Store.Selected and Store.Selected.id==p.id and accent or text,14)
+            local record=Store.Installed[p.id]
+            label(row,'Author',record and (enabled(record.file) and 'Enabled' or 'Installed') or p.author,12,35,Store.ListWidth-34,20,muted,12)
+            table.insert(rowConnections,row.Activated:Connect(function() Store.Selected=p;Store.ShowDetails=true;Store.Render() end))
+        end
+        list.CanvasSize=UDim2.fromOffset(0,math.min(12,#filtered-(Store.Page-1)*12)*68)
+        local p=Store.Selected
+        for _,b in ipairs({install,enable,remove,preview}) do b.Visible=p~=nil end
+        if p then
+            name.Text=p.name;author.Text=p.author..'  /  '..p.version
+            description.Text=p.description:gsub('[#`*]','')
+            local record=Store.Installed[p.id];local present=record and exists(record.file)
+            status.Text=present and (enabled(record.file) and 'Enabled in Infinite Yield' or (record.version~=p.version and 'Update available' or 'Installed / ready to enable')) or 'Not installed'
+            install.Text=present and 'Update' or 'Install';enable.Text=present and enabled(record.file) and 'Disable' or 'Enable'
+            enable.Visible=present==true;remove.Visible=record~=nil
+        end
+    end
+    connect(search:GetPropertyChangedSignal('Text'),function() Store.Page=1;Store.Render() end)
+    Store.Render()
+    if #Store.Catalog==0 then run(Store.Refresh) end
+    Store.RowCleanup=function() for _,c in ipairs(rowConnections) do c:Disconnect() end end
+end
+function Store.Destroy()
+    for _,c in ipairs(Store.Connections) do c:Disconnect() end
+    if Store.RowCleanup then Store.RowCleanup() end
+    if Store.Gui then Store.Gui:Destroy() end
+    if Store.Button then Store.Button:Destroy() end
+end
+if api.PluginsFrame then
+    Store.Button=create('TextButton',api.PluginsFrame,{Name='PluginStore',Text='Plugin Store',Size=UDim2.fromOffset(120,20),Position=UDim2.fromOffset(65,150),BackgroundColor3=Color3.fromRGB(181,243,108),TextColor3=Color3.fromRGB(20,30,14),BorderSizePixel=0,FontFace=Font.new("rbxasset://fonts/families/Montserrat.json",Enum.FontWeight.Medium),TextSize=12,ZIndex=10})
+    connect(Store.Button.Activated,Store.Open)
+end
+pcall(function() Store.Catalog=normalize(readJSON(cacheFile,{})) end)
+return {
+    PluginName='IY Plugin Store',PluginDescription='Browse, install and manage plugins from your own catalog.',
+    Commands={
+        pluginstore={ListName='pluginstore / store',Description='Open the IY Plugin Store.',Aliases={'store'},Function=function() Store.Open() end},
+        storeurl={ListName='storeurl [https catalog URL]',Description='Set your website catalog URL.',Aliases={},Function=function(args)
+            run(function()
+                local url=args[1];local data=Http:JSONDecode(getURL(url));normalize(data)
+                local previous=Store.Config.CatalogURL;Store.Config.CatalogURL=url
+                local ok,err=pcall(save,configFile,Store.Config)
+                if not ok then Store.Config.CatalogURL=previous;error(err) end
+                pcall(save,cacheFile,data);Store.Catalog=normalize(data);notify('Catalog connected: '..#Store.Catalog..' plugins.')
+            end)
+        end},
+        storerefresh={Description='Refresh the plugin catalog.',Aliases={},Function=function() run(Store.Refresh) end},
+        storeinstall={ListName='storeinstall [plugin ID]',Description='Download a plugin without executing it.',Aliases={},Function=function(args) run(function() if #Store.Catalog==0 then Store.Refresh() end;Store.Install(args[1]) end) end},
+        storeenable={ListName='storeenable [plugin ID]',Description='Enable an installed plugin.',Aliases={},Function=function(args) run(function() Store.Enable(args[1]) end) end},
+        storedisable={ListName='storedisable [plugin ID]',Description='Remove plugin commands from IY.',Aliases={},Function=function(args) run(function() Store.Disable(args[1]) end) end},
+        storeremove={ListName='storeremove [plugin ID]',Description='Disable and delete an installed plugin file.',Aliases={},Function=function(args) run(function() Store.Remove(args[1]) end) end}
+    }
+}
+
+    end
+    local storePlugin = makeStore()
+    for name, command in pairs(storePlugin.Commands) do
+        addcmd(name, command.Aliases, command.Function)
+        addcmdtext(command.ListName or name, nil, command.Description)
+    end
+end
+-- END IY PLUGIN STORE INTEGRATION
+
 addcmd("addallplugins", {"loadallplugins"}, function(args, speaker)
 	if not listfiles or not isfolder then
 		notify("Incompatible Exploit", "Your exploit does not support this command (missing listfiles/isfolder)")
