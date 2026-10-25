@@ -13389,8 +13389,8 @@ return {
     end
     local storePlugin = makeStore()
     for name, command in pairs(storePlugin.Commands) do
-        addcmd(name, command.Aliases, command.Function)
-        addcmdtext(command.ListName or name, nil, command.Description)
+        addcmd(name, command.Aliases, command.Function, 'IYPluginStoreBuiltin.iy')
+        addcmdtext(command.ListName or name, 'IYPluginStoreBuiltin.iy', command.Description)
     end
 end
 -- END IY PLUGIN STORE INTEGRATION
